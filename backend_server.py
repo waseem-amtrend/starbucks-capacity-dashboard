@@ -127,12 +127,13 @@ def get_epicor_headers():
 
 
 def query_epicor_partwhse(part_num):
-    """Query inventory for a specific part from PartWhse"""
+    """Query inventory for a specific part using PartSvc/PartWhses entity"""
     try:
-        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartWhseSvc/PartWhses"
+        # Use PartSvc/PartWhses - the correct entity path for warehouse inventory
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/PartWhses"
         params = {
             "$filter": f"PartNum eq '{part_num}'",
-            "$select": "PartNum,WarehouseCode,OnHandQty,AllocatedQty,PartDescription,IUM"
+            "$select": "PartNum,WarehouseCode,OnHandQty,AllocatedQty"
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
         response.raise_for_status()
@@ -142,13 +143,30 @@ def query_epicor_partwhse(part_num):
         return None
 
 
-def query_epicor_partbin(part_num):
-    """Query inventory by bin for a specific part using PartBinSearch"""
+def query_epicor_part(part_num):
+    """Query part master info for description and UOM"""
     try:
-        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartBinSearchSvc/PartBinSearches"
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/Parts"
         params = {
             "$filter": f"PartNum eq '{part_num}'",
-            "$select": "PartNum,WarehouseCode,BinNum,OnhandQty,PartDescription"
+            "$top": "1",
+            "$select": "PartNum,PartDescription,IUM"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error querying Part for {part_num}: {e}")
+        return None
+
+
+def query_epicor_partbin(part_num):
+    """Query inventory by bin for a specific part using PartSvc/PartBins"""
+    try:
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/PartBins"
+        params = {
+            "$filter": f"PartNum eq '{part_num}'",
+            "$select": "PartNum,WarehouseCode,BinNum,OnhandQty"
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
         response.raise_for_status()
@@ -159,14 +177,14 @@ def query_epicor_partbin(part_num):
 
 
 def query_epicor_open_pos(part_nums):
-    """Query open purchase orders using PORel service"""
+    """Query open purchase orders using POSvc/PORels"""
     try:
-        # Build filter for multiple parts
+        # Build filter for multiple parts - use POSvc not PORelSvc
         part_filter = " or ".join([f"PartNum eq '{p}'" for p in part_nums])
-        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PORelSvc/PORels"
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.POSvc/PORels"
         params = {
             "$filter": f"({part_filter}) and OpenRelease eq true",
-            "$select": "PONum,POLine,PORelNum,PartNum,VendorID,XRelQty,ReceivedQty,DueDate,PromiseDt",
+            "$select": "PONum,POLine,PORelNum,PartNum,XRelQty,ReceivedQty,DueDate,PromiseDt",
             "$orderby": "DueDate"
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
@@ -197,42 +215,53 @@ def get_inventory():
     errors = []
 
     for part_num in components:
-        result = query_epicor_partwhse(part_num)
-        if result and "value" in result and len(result["value"]) > 0:
-            # Sum up inventory across warehouses
-            total_on_hand = sum(r.get("OnHandQty", 0) for r in result["value"])
-            total_allocated = sum(r.get("AllocatedQty", 0) for r in result["value"])
+        # Get inventory quantities from PartWhses
+        whse_result = query_epicor_partwhse(part_num)
+
+        # Get part master info (description, UOM) from Parts
+        part_result = query_epicor_part(part_num)
+
+        # Extract part info
+        description = ""
+        uom = "EA"
+        if part_result and "value" in part_result and len(part_result["value"]) > 0:
+            part_info = part_result["value"][0]
+            description = part_info.get("PartDescription", "")
+            uom = part_info.get("IUM", "EA")
+
+        if whse_result and "value" in whse_result and len(whse_result["value"]) > 0:
+            # Sum up inventory across warehouses - ensure numeric conversion
+            total_on_hand = sum(float(r.get("OnHandQty", 0) or 0) for r in whse_result["value"])
+            total_allocated = sum(float(r.get("AllocatedQty", 0) or 0) for r in whse_result["value"])
             available = total_on_hand - total_allocated
 
-            # Get description and UOM from first record
-            first_record = result["value"][0]
             inventory_data[part_num] = {
                 "partNum": part_num,
-                "description": first_record.get("PartDescription", ""),
+                "description": description,
                 "onHand": total_on_hand,
                 "allocated": total_allocated,
                 "available": available,
-                "uom": first_record.get("IUM", "EA"),
+                "uom": uom,
                 "warehouses": [
                     {
                         "warehouseCode": r.get("WarehouseCode", ""),
-                        "onHand": r.get("OnHandQty", 0),
-                        "allocated": r.get("AllocatedQty", 0)
+                        "onHand": float(r.get("OnHandQty", 0) or 0),
+                        "allocated": float(r.get("AllocatedQty", 0) or 0)
                     }
-                    for r in result["value"]
+                    for r in whse_result["value"]
                 ]
             }
         else:
             errors.append(part_num)
             inventory_data[part_num] = {
                 "partNum": part_num,
-                "description": "",
+                "description": description,
                 "onHand": 0,
                 "allocated": 0,
                 "available": 0,
-                "uom": "EA",
+                "uom": uom,
                 "warehouses": [],
-                "error": "Failed to fetch from Epicor"
+                "error": "Failed to fetch inventory from Epicor"
             }
 
     return jsonify({
@@ -261,8 +290,9 @@ def get_open_pos():
                 if part_num not in pos_data:
                     pos_data[part_num] = []
 
-                rel_qty = record.get("PORel_XRelQty", 0) or record.get("RelQty", 0)
-                recv_qty = record.get("PORel_ReceivedQty", 0) or record.get("ReceivedQty", 0)
+                # Ensure numeric conversion - Epicor may return strings
+                rel_qty = float(record.get("PORel_XRelQty", 0) or record.get("RelQty", 0) or 0)
+                recv_qty = float(record.get("PORel_ReceivedQty", 0) or record.get("ReceivedQty", 0) or 0)
 
                 pos_data[part_num].append({
                     "poNum": record.get("PORel_PONum", "") or record.get("PONum", ""),
@@ -280,7 +310,7 @@ def get_open_pos():
                     "status": record.get("Calculated_Status", "Open")
                 })
     else:
-        # Fallback: Query PORelSearch directly
+        # Fallback: Query PORels directly
         result = query_epicor_open_pos(components)
         if result and "value" in result:
             for record in result["value"]:
@@ -288,8 +318,9 @@ def get_open_pos():
                 if part_num not in pos_data:
                     pos_data[part_num] = []
 
-                rel_qty = record.get("RelQty", 0)
-                recv_qty = record.get("ReceivedQty", 0)
+                # Ensure numeric conversion - Epicor may return strings
+                rel_qty = float(record.get("XRelQty", 0) or record.get("RelQty", 0) or 0)
+                recv_qty = float(record.get("ReceivedQty", 0) or 0)
 
                 pos_data[part_num].append({
                     "poNum": record.get("PONum", ""),
