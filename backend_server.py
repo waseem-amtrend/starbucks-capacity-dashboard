@@ -127,20 +127,48 @@ def get_epicor_headers():
 
 
 def query_epicor_partwhse(part_num):
-    """Query inventory for a specific part using PartSvc/PartWhses entity"""
+    """Query inventory for a specific part - tries PartWhses then falls back to PartCostSearches"""
+    # First try PartSvc/PartWhses
     try:
-        # Use PartSvc/PartWhses - the correct entity path for warehouse inventory
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/PartWhses"
         params = {
             "$filter": f"PartNum eq '{part_num}'",
             "$select": "PartNum,WarehouseCode,OnHandQty,AllocatedQty"
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
-        response.raise_for_status()
-        return response.json()
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("value") and len(data["value"]) > 0:
+                return data
     except requests.exceptions.RequestException as e:
         print(f"Error querying PartWhse for {part_num}: {e}")
-        return None
+
+    # Fallback: Use PartCostSearchSvc to get TotalQtyAvg (on-hand quantity for average costing)
+    try:
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartCostSearchSvc/PartCostSearches"
+        params = {
+            "$filter": f"PartNum eq '{part_num}'",
+            "$top": "1",
+            "$select": "PartNum,TotalQtyAvg"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("value") and len(data["value"]) > 0:
+                qty = float(data["value"][0].get("TotalQtyAvg", 0) or 0)
+                # Return synthetic warehouse record matching the format
+                return {
+                    "value": [{
+                        "PartNum": part_num,
+                        "WarehouseCode": "TOTAL",
+                        "OnHandQty": qty,
+                        "AllocatedQty": 0
+                    }]
+                }
+    except requests.exceptions.RequestException as e:
+        print(f"Error querying PartCostSearch for {part_num}: {e}")
+
+    return None
 
 
 def query_epicor_part(part_num):
