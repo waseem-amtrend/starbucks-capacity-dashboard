@@ -430,9 +430,9 @@ def query_all_job_demands(part_nums):
                         })
             return job_demands
 
-        # Process most recent jobs in parallel (limit to 50 jobs to avoid timeout)
+        # Process most recent jobs in parallel (limit to 30 jobs to avoid timeout)
         # Sort by job number descending to get most recent first
-        recent_sbx_jobs = sorted(sbx_jobs, reverse=True)[:50]
+        recent_sbx_jobs = sorted(sbx_jobs, reverse=True)[:30]
         print(f"Processing {len(recent_sbx_jobs)} most recent SBX jobs for materials")
 
         all_demands = []
@@ -832,8 +832,28 @@ def preload_part_cache():
     print(f"Part cache preloaded with {len(PART_INFO_CACHE)} parts")
 
 
+def preload_job_demands_background():
+    """Preload job demands in background thread to avoid first-request delay"""
+    import threading
+    import time
+
+    def load_demands():
+        time.sleep(2)  # Wait for server to be ready
+        try:
+            print("Background: Preloading job demands...")
+            components = get_all_components()
+            query_all_job_demands(components)
+            print("Background: Job demands preloaded successfully")
+        except Exception as e:
+            print(f"Background: Error preloading job demands: {e}")
+
+    thread = threading.Thread(target=load_demands, daemon=True)
+    thread.start()
+
+
 # Preload cache on startup (for gunicorn workers)
 preload_part_cache()
+preload_job_demands_background()
 
 
 if __name__ == '__main__':
