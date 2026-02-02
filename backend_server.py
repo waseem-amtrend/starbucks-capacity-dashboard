@@ -372,8 +372,8 @@ def query_all_job_demands(part_nums):
     """
     global JOB_DEMANDS_CACHE, JOB_DEMANDS_CACHE_TIME
 
-    # If cache is less than 30 seconds old, return it (within same request cycle)
-    if JOB_DEMANDS_CACHE_TIME and (datetime.now() - JOB_DEMANDS_CACHE_TIME).seconds < 30:
+    # Cache job demands for 5 minutes to avoid repeated expensive queries
+    if JOB_DEMANDS_CACHE_TIME and (datetime.now() - JOB_DEMANDS_CACHE_TIME).seconds < 300:
         return JOB_DEMANDS_CACHE
 
     results = {p: {"totalDemand": 0, "jobCount": 0, "jobs": []} for p in part_nums}
@@ -430,10 +430,14 @@ def query_all_job_demands(part_nums):
                         })
             return job_demands
 
-        # Process jobs in parallel (limit to 10 at a time)
+        # Process most recent jobs in parallel (limit to 50 jobs to avoid timeout)
+        # Sort by job number descending to get most recent first
+        recent_sbx_jobs = sorted(sbx_jobs, reverse=True)[:50]
+        print(f"Processing {len(recent_sbx_jobs)} most recent SBX jobs for materials")
+
         all_demands = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(process_job, job): job for job in sbx_jobs[:100]}  # Limit to 100 jobs
+        with ThreadPoolExecutor(max_workers=15) as executor:  # Increased parallelism
+            futures = {executor.submit(process_job, job): job for job in recent_sbx_jobs}
             for future in as_completed(futures):
                 demands = future.result()
                 all_demands.extend(demands)
