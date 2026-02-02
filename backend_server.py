@@ -260,30 +260,44 @@ JOB_DEMANDS_CACHE_TIME = None
 STARBUCKS_CUST_NUM = 272
 
 
+# Cache for Starbucks jobs (refreshed every 60 seconds)
+STARBUCKS_JOBS_CACHE = set()
+STARBUCKS_JOBS_CACHE_TIME = None
+
+
 def get_starbucks_open_jobs():
     """Get list of open job numbers for Starbucks customer (CustNum 272).
     Returns set of job numbers like {'024266-1-1', '024189-1-1', ...}
+    Uses cache to avoid repeated API calls.
     """
+    global STARBUCKS_JOBS_CACHE, STARBUCKS_JOBS_CACHE_TIME
+
+    # Return cached data if less than 60 seconds old
+    if STARBUCKS_JOBS_CACHE_TIME and (datetime.now() - STARBUCKS_JOBS_CACHE_TIME).seconds < 60:
+        return STARBUCKS_JOBS_CACHE
+
     try:
         # Query JobEntry for open jobs linked to Starbucks via XRefCustNum
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobEntries"
         params = {
             "$filter": f"XRefCustNum eq {STARBUCKS_CUST_NUM} and JobComplete eq false and JobClosed eq false",
-            "$select": "JobNum,PartNum,XRefCustNum",
-            "$top": "200"
+            "$select": "JobNum",
+            "$top": "500"  # Get more jobs to ensure coverage
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
         if response.status_code == 200:
             data = response.json()
             jobs = set(j.get("JobNum", "") for j in data.get("value", []) if j.get("JobNum"))
             print(f"Found {len(jobs)} open jobs for Starbucks (XRefCustNum {STARBUCKS_CUST_NUM})")
+            STARBUCKS_JOBS_CACHE = jobs
+            STARBUCKS_JOBS_CACHE_TIME = datetime.now()
             return jobs
         else:
             print(f"JobEntry query returned {response.status_code}: {response.text[:200]}")
     except Exception as e:
         print(f"Error getting Starbucks jobs: {e}")
 
-    return set()
+    return STARBUCKS_JOBS_CACHE if STARBUCKS_JOBS_CACHE else set()
 
 
 def query_all_job_demands(part_nums):
