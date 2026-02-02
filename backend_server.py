@@ -14,12 +14,13 @@ import base64
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Epicor REST API Configuration
+# Epicor REST API Configuration - v1 API
 EPICOR_CONFIG = {
-    "base_url": "https://centralusdtapp20.epicorsaas.com/SaaS704/api/v2/odata/AMT",
+    "base_url": "https://centralusdtapp20.epicorsaas.com/SaaS704/api/v1",
     "username": os.environ.get("EPICOR_USERNAME", "Claude.AI"),
     "password": os.environ.get("EPICOR_PASSWORD", "@Mtrend2026"),
-    "api_key": os.environ.get("EPICOR_API_KEY", "LgbgeQtNgh5GzbS27ZFpbeFigdJzQ4HEI6QpqBytRF8Xn")
+    "api_key": os.environ.get("EPICOR_API_KEY", "LgbgeQtNgh5GzbS27ZFpbeFigdJzQ4HEI6QpqBytRF8Xn"),
+    "company": "28648"  # Company ID for authentication
 }
 
 # Master BOM from Quote 109209
@@ -142,7 +143,7 @@ def query_epicor_partwhse(part_num):
 
 
 def query_epicor_partbin(part_num):
-    """Query inventory by bin for a specific part"""
+    """Query inventory by bin for a specific part using PartBinSearch"""
     try:
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartBinSearchSvc/PartBinSearches"
         params = {
@@ -158,14 +159,14 @@ def query_epicor_partbin(part_num):
 
 
 def query_epicor_open_pos(part_nums):
-    """Query open purchase orders for specified parts"""
+    """Query open purchase orders using PORel service"""
     try:
         # Build filter for multiple parts
-        part_filter = " or ".join([f"PODetail_PartNum eq '{p}'" for p in part_nums])
-        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PORelSearchSvc/PORelSearches"
+        part_filter = " or ".join([f"PartNum eq '{p}'" for p in part_nums])
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PORelSvc/PORels"
         params = {
             "$filter": f"({part_filter}) and OpenRelease eq true",
-            "$select": "PONum,POLine,PORelNum,PartNum,LineDesc,VendorName,RelQty,ReceivedQty,DueDate,PromiseDt",
+            "$select": "PONum,POLine,PORelNum,PartNum,VendorID,XRelQty,ReceivedQty,DueDate,PromiseDt",
             "$orderby": "DueDate"
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
@@ -190,9 +191,10 @@ def query_epicor_baq(baq_name, params_dict=None):
 
 @app.route('/api/inventory', methods=['GET'])
 def get_inventory():
-    """Query current inventory from Epicor for all BOM components"""
+    """Query current inventory from Epicor for all BOM components - REAL-TIME DATA ONLY"""
     components = get_all_components()
     inventory_data = {}
+    errors = []
 
     for part_num in components:
         result = query_epicor_partwhse(part_num)
@@ -221,7 +223,7 @@ def get_inventory():
                 ]
             }
         else:
-            # Part not found or no inventory
+            errors.append(part_num)
             inventory_data[part_num] = {
                 "partNum": part_num,
                 "description": "",
@@ -229,14 +231,16 @@ def get_inventory():
                 "allocated": 0,
                 "available": 0,
                 "uom": "EA",
-                "warehouses": []
+                "warehouses": [],
+                "error": "Failed to fetch from Epicor"
             }
 
     return jsonify({
-        "success": True,
+        "success": len(errors) == 0,
         "data": inventory_data,
         "timestamp": datetime.now().isoformat(),
-        "source": "Epicor REST API"
+        "source": "Epicor Kinetic REST API - Live",
+        "errors": errors if errors else None
     })
 
 
