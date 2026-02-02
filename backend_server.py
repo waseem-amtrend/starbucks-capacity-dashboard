@@ -252,10 +252,77 @@ def query_epicor_baq(baq_name, params_dict=None):
         return None
 
 
+def query_epicor_job_demands(part_num):
+    """Query open job material demands for a specific part.
+    Returns total qty required - qty issued for open/released jobs.
+    """
+    try:
+        # Query JobMtl for this part where job is not complete/closed
+        # We need to join with JobHead to check job status
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobMtls"
+        params = {
+            "$filter": f"PartNum eq '{part_num}'",
+            "$select": "JobNum,PartNum,RequiredQty,IssuedQty,IssueComplete,Description"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        if response.status_code != 200:
+            print(f"JobMtl query returned {response.status_code} for {part_num}")
+            return None
+
+        data = response.json()
+        if not data.get("value"):
+            return {"partNum": part_num, "totalDemand": 0, "jobs": []}
+
+        # Now we need to check which jobs are open - query JobHead for each unique job
+        job_nums = list(set(r.get("JobNum", "") for r in data["value"] if r.get("JobNum")))
+        open_jobs = set()
+
+        if job_nums:
+            # Query JobHead to find open jobs (not complete and not closed)
+            job_filter = " or ".join([f"JobNum eq '{j}'" for j in job_nums[:50]])  # Limit to 50
+            job_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobHeads"
+            job_params = {
+                "$filter": f"({job_filter}) and JobComplete eq false and JobClosed eq false",
+                "$select": "JobNum,PartNum,ProdQty,JobReleased"
+            }
+            job_response = requests.get(job_url, headers=get_epicor_headers(), params=job_params, timeout=30)
+            if job_response.status_code == 200:
+                job_data = job_response.json()
+                open_jobs = set(j.get("JobNum", "") for j in job_data.get("value", []))
+
+        # Calculate total demand from open jobs only
+        total_demand = 0
+        job_details = []
+        for mtl in data["value"]:
+            job_num = mtl.get("JobNum", "")
+            if job_num in open_jobs and not mtl.get("IssueComplete", False):
+                required = float(mtl.get("RequiredQty", 0) or 0)
+                issued = float(mtl.get("IssuedQty", 0) or 0)
+                remaining = max(0, required - issued)
+                if remaining > 0:
+                    total_demand += remaining
+                    job_details.append({
+                        "jobNum": job_num,
+                        "required": required,
+                        "issued": issued,
+                        "remaining": remaining
+                    })
+
+        return {
+            "partNum": part_num,
+            "totalDemand": total_demand,
+            "jobs": job_details
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error querying job demands for {part_num}: {e}")
+        return None
+
+
 def fetch_part_inventory(part_num):
-    """Fetch inventory and part info for a single part - used for parallel execution"""
+    """Fetch inventory, part info, and job demands for a single part - used for parallel execution"""
     whse_result = query_epicor_partwhse(part_num)
     part_result = query_epicor_part(part_num)
+    demand_result = query_epicor_job_demands(part_num)
 
     description = ""
     uom = "EA"
@@ -264,17 +331,32 @@ def fetch_part_inventory(part_num):
         description = part_info.get("PartDescription", "")
         uom = part_info.get("IUM", "EA")
 
+    # Get job demand (committed to open jobs)
+    job_demand = 0
+    job_count = 0
+    if demand_result:
+        job_demand = demand_result.get("totalDemand", 0)
+        job_count = len(demand_result.get("jobs", []))
+
     if whse_result and "value" in whse_result and len(whse_result["value"]) > 0:
         total_on_hand = sum(float(r.get("OnHandQty", 0) or 0) for r in whse_result["value"])
         total_allocated = sum(float(r.get("AllocatedQty", 0) or 0) for r in whse_result["value"])
+
+        # True available = On Hand - Allocated (from Epicor) - Job Demands (uncommitted material)
+        # Note: Epicor's AllocatedQty may or may not include job demands depending on config
+        # We add jobDemand separately to be safe and transparent
         available = total_on_hand - total_allocated
+        true_available = max(0, available - job_demand)
 
         return {
             "partNum": part_num,
             "description": description,
             "onHand": total_on_hand,
             "allocated": total_allocated,
+            "jobDemand": job_demand,
+            "jobCount": job_count,
             "available": available,
+            "trueAvailable": true_available,
             "uom": uom,
             "warehouses": [
                 {
@@ -292,7 +374,10 @@ def fetch_part_inventory(part_num):
             "description": description,
             "onHand": 0,
             "allocated": 0,
+            "jobDemand": job_demand,
+            "jobCount": job_count,
             "available": 0,
+            "trueAvailable": 0,
             "uom": uom,
             "warehouses": [],
             "error": "Failed to fetch inventory from Epicor"
@@ -445,18 +530,26 @@ def calculate_capacity():
         bottlenecks = []
 
         for component, details in sku_data["components"].items():
-            inv = inventory.get(component, {"available": 0, "onHand": 0, "allocated": 0})
+            inv = inventory.get(component, {"available": 0, "trueAvailable": 0, "onHand": 0, "allocated": 0, "jobDemand": 0, "jobCount": 0})
             component_pos = pos.get(component, [])
 
             incoming_qty = sum(po.get("remainQty", 0) for po in component_pos)
-            available = inv.get("available", 0)
-            future_available = available + incoming_qty
 
-            max_units_now = int(available / details["qty"]) if details["qty"] > 0 else 0
+            # Use trueAvailable (which accounts for job demands) for capacity calculation
+            available = inv.get("available", 0)  # Raw available (onHand - allocated)
+            true_available = inv.get("trueAvailable", available)  # After subtracting job demands
+            job_demand = inv.get("jobDemand", 0)
+            job_count = inv.get("jobCount", 0)
+
+            # Future available is based on true available + incoming POs
+            future_available = true_available + incoming_qty
+
+            # Calculate capacity using TRUE available (after job demands)
+            max_units_now = int(true_available / details["qty"]) if details["qty"] > 0 else 0
             max_units_future = int(future_available / details["qty"]) if details["qty"] > 0 else 0
 
-            # Determine status
-            if available <= 0:
+            # Determine status based on true available
+            if true_available <= 0:
                 status = "critical"
             elif max_units_now < 10:
                 status = "warning"
@@ -467,7 +560,10 @@ def calculate_capacity():
                 "component": component,
                 "description": inv.get("description", ""),
                 "qtyPer": details["qty"],
-                "available": available,
+                "available": available,  # Raw available (before job demands)
+                "trueAvailable": true_available,  # After job demands
+                "jobDemand": job_demand,  # Qty committed to open jobs
+                "jobCount": job_count,  # Number of jobs
                 "onHand": inv.get("onHand", 0),
                 "allocated": inv.get("allocated", 0),
                 "incomingQty": incoming_qty,

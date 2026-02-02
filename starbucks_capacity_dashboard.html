@@ -664,7 +664,8 @@
                             <th>Description</th>
                             <th>Type</th>
                             <th>On Hand</th>
-                            <th>Available</th>
+                            <th>Committed</th>
+                            <th>True Avail</th>
                             <th>Incoming</th>
                             <th>Future</th>
                             <th>UOM</th>
@@ -854,22 +855,32 @@
 
                 const isBlocked = skuData.maxProductionNow === 0;
 
-                // Build simplified BOM rows - no PO details
+                // Build simplified BOM rows with committed qty
                 let bomRows = '';
                 skuData.bottlenecks.forEach(b => {
                     const incomingHtml = b.incomingQty > 0
                         ? `<span class="po-badge">+${formatNumber(b.incomingQty)}</span>`
                         : '-';
 
+                    // Show committed qty (job demand)
+                    const jobDemand = b.jobDemand || 0;
+                    const committedHtml = jobDemand > 0
+                        ? `<span class="status-badge warning">${formatNumber(jobDemand)}</span>`
+                        : '-';
+
+                    // Use trueAvailable
+                    const trueAvailable = b.trueAvailable !== undefined ? b.trueAvailable : b.available;
+
                     bomRows += `
                         <tr>
                             <td><strong>${b.component}</strong></td>
                             <td><span class="component-type ${b.type.toLowerCase()}">${b.type}</span></td>
                             <td>${formatNumber(b.qtyPer)} ${b.uom}</td>
-                            <td>${formatNumber(b.available)}</td>
+                            <td>${committedHtml}</td>
+                            <td><strong>${formatNumber(trueAvailable)}</strong></td>
                             <td>${incomingHtml}</td>
                             <td><strong>${formatNumber(b.futureAvailable)}</strong></td>
-                            <td>${getStatusBadge(b.available, b.maxUnitsNow)}</td>
+                            <td>${getStatusBadge(trueAvailable, b.maxUnitsNow)}</td>
                         </tr>
                     `;
                 });
@@ -902,7 +913,8 @@
                                 <th>Component</th>
                                 <th>Type</th>
                                 <th>Qty/Unit</th>
-                                <th>Available</th>
+                                <th>Committed</th>
+                                <th>True Avail</th>
                                 <th>Incoming</th>
                                 <th>Future</th>
                                 <th>Status</th>
@@ -943,17 +955,28 @@
                     ? `<span class="po-badge">+${formatNumber(comp.incomingQty)}</span>`
                     : '-';
 
+                // Show committed qty (job demand) with job count
+                const jobDemand = comp.jobDemand || 0;
+                const jobCount = comp.jobCount || 0;
+                const committedHtml = jobDemand > 0
+                    ? `<span class="status-badge warning">${formatNumber(jobDemand)} (${jobCount} job${jobCount !== 1 ? 's' : ''})</span>`
+                    : '-';
+
+                // Use trueAvailable for the available column
+                const trueAvailable = comp.trueAvailable !== undefined ? comp.trueAvailable : comp.available;
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><strong>${comp.component}</strong></td>
                     <td>${comp.description || '-'}</td>
                     <td><span class="component-type ${comp.type.toLowerCase()}">${comp.type}</span></td>
                     <td>${formatNumber(comp.onHand)}</td>
-                    <td>${formatNumber(comp.available)}</td>
+                    <td>${committedHtml}</td>
+                    <td><strong>${formatNumber(trueAvailable)}</strong></td>
                     <td>${incomingHtml}</td>
                     <td><strong>${formatNumber(comp.futureAvailable)}</strong></td>
                     <td>${comp.uom}</td>
-                    <td>${getStatusBadge(comp.available, comp.maxUnitsNow)}</td>
+                    <td>${getStatusBadge(trueAvailable, comp.maxUnitsNow)}</td>
                 `;
                 tbody.appendChild(row);
             });
