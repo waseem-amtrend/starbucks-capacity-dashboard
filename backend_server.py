@@ -265,10 +265,31 @@ STARBUCKS_JOBS_CACHE = set()
 STARBUCKS_JOBS_CACHE_TIME = None
 
 
+def get_starbucks_order_numbers():
+    """Get set of order numbers for Starbucks customer (CustNum 272).
+    Used to identify Starbucks jobs via job number pattern (OrderNum-Line-Release).
+    """
+    try:
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.SalesOrderSvc/SalesOrders"
+        params = {
+            "$filter": f"CustNum eq {STARBUCKS_CUST_NUM} and OpenOrder eq true",
+            "$select": "OrderNum",
+            "$top": "500"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            orders = set(str(o.get("OrderNum", "")).zfill(6) for o in data.get("value", []) if o.get("OrderNum"))
+            return orders
+    except Exception as e:
+        print(f"Error getting Starbucks orders: {e}")
+    return set()
+
+
 def get_starbucks_open_jobs():
     """Get list of open job numbers for Starbucks customer (CustNum 272).
-    Returns set of job numbers like {'024266-1-1', '024189-1-1', ...}
-    Uses cache to avoid repeated API calls.
+    Returns set of job numbers like {'025043-1-1', '024189-1-1', ...}
+    Uses two methods: XRefCustNum and job number pattern matching to order numbers.
     """
     global STARBUCKS_JOBS_CACHE, STARBUCKS_JOBS_CACHE_TIME
 
@@ -276,24 +297,53 @@ def get_starbucks_open_jobs():
     if STARBUCKS_JOBS_CACHE_TIME and (datetime.now() - STARBUCKS_JOBS_CACHE_TIME).seconds < 60:
         return STARBUCKS_JOBS_CACHE
 
+    all_jobs = set()
+
     try:
-        # Query JobEntry for open jobs linked to Starbucks via XRefCustNum
+        # Method 1: Query jobs with XRefCustNum set to Starbucks
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobEntries"
         params = {
             "$filter": f"XRefCustNum eq {STARBUCKS_CUST_NUM} and JobComplete eq false and JobClosed eq false",
             "$select": "JobNum",
-            "$top": "500"  # Get more jobs to ensure coverage
+            "$top": "500"
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
         if response.status_code == 200:
             data = response.json()
             jobs = set(j.get("JobNum", "") for j in data.get("value", []) if j.get("JobNum"))
-            print(f"Found {len(jobs)} open jobs for Starbucks (XRefCustNum {STARBUCKS_CUST_NUM})")
-            STARBUCKS_JOBS_CACHE = jobs
-            STARBUCKS_JOBS_CACHE_TIME = datetime.now()
-            return jobs
-        else:
-            print(f"JobEntry query returned {response.status_code}: {response.text[:200]}")
+            all_jobs.update(jobs)
+            print(f"Found {len(jobs)} jobs via XRefCustNum")
+
+        # Method 2: Get Starbucks open orders and match job numbers
+        starbucks_orders = get_starbucks_order_numbers()
+        if starbucks_orders:
+            # Query all open jobs (ordered by most recent) and filter by order number pattern
+            url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobEntries"
+            params = {
+                "$filter": "JobComplete eq false and JobClosed eq false",
+                "$select": "JobNum",
+                "$orderby": "JobNum desc",  # Most recent jobs first
+                "$top": "2000"  # Increase limit to get more jobs
+            }
+            response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                order_matched = 0
+                for job in data.get("value", []):
+                    job_num = job.get("JobNum", "")
+                    # Job format: OrderNum-Line-Release (e.g., 025043-1-1)
+                    if "-" in job_num:
+                        order_part = job_num.split("-")[0]
+                        if order_part in starbucks_orders:
+                            all_jobs.add(job_num)
+                            order_matched += 1
+                print(f"Found {order_matched} additional jobs via order number matching")
+
+        print(f"Total Starbucks jobs: {len(all_jobs)}")
+        STARBUCKS_JOBS_CACHE = all_jobs
+        STARBUCKS_JOBS_CACHE_TIME = datetime.now()
+        return all_jobs
+
     except Exception as e:
         print(f"Error getting Starbucks jobs: {e}")
 
