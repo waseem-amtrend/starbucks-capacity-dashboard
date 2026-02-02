@@ -8,12 +8,17 @@ from flask_cors import CORS
 import requests
 from requests.auth import HTTPBasicAuth
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import base64
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
+
+# Cache for part descriptions (they don't change frequently)
+# This is for part master info only - inventory is always fetched fresh
+PART_INFO_CACHE = {}
+PART_CACHE_EXPIRY = timedelta(hours=1)  # Cache part descriptions for 1 hour
 
 # Epicor REST API Configuration - v1 API
 EPICOR_CONFIG = {
@@ -173,7 +178,14 @@ def query_epicor_partwhse(part_num):
 
 
 def query_epicor_part(part_num):
-    """Query part master info for description and UOM"""
+    """Query part master info for description and UOM - uses cache for speed"""
+    # Check cache first
+    cache_entry = PART_INFO_CACHE.get(part_num)
+    if cache_entry:
+        cached_time, cached_data = cache_entry
+        if datetime.now() - cached_time < PART_CACHE_EXPIRY:
+            return cached_data
+
     try:
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/Parts"
         params = {
@@ -183,7 +195,11 @@ def query_epicor_part(part_num):
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+
+        # Cache the result
+        PART_INFO_CACHE[part_num] = (datetime.now(), result)
+        return result
     except requests.exceptions.RequestException as e:
         print(f"Error querying Part for {part_num}: {e}")
         return None
@@ -534,8 +550,32 @@ def health_check():
             "connected": epicor_connected,
             "endpoint": EPICOR_CONFIG["base_url"],
             "error": epicor_error
+        },
+        "cache": {
+            "partInfoCached": len(PART_INFO_CACHE)
         }
     })
+
+
+def preload_part_cache():
+    """Preload part descriptions into cache for faster responses"""
+    components = get_all_components()
+    print(f"Preloading part info cache for {len(components)} components...")
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(query_epicor_part, part): part for part in components}
+        for future in as_completed(futures):
+            part = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Error preloading {part}: {e}")
+
+    print(f"Part cache preloaded with {len(PART_INFO_CACHE)} parts")
+
+
+# Preload cache on startup (for gunicorn workers)
+preload_part_cache()
 
 
 if __name__ == '__main__':
