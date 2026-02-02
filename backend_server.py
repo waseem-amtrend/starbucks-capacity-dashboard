@@ -350,8 +350,24 @@ def get_starbucks_open_jobs():
     return STARBUCKS_JOBS_CACHE if STARBUCKS_JOBS_CACHE else set()
 
 
+def get_job_materials_via_getbyid(job_num):
+    """Get job materials using GetByID method (OData entity query doesn't return materials)."""
+    try:
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/GetByID"
+        params = {"jobNum": job_num}
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if 'returnObj' in data and 'JobMtl' in data['returnObj']:
+                return data['returnObj']['JobMtl']
+    except Exception as e:
+        print(f"Error getting materials for job {job_num}: {e}")
+    return []
+
+
 def query_all_job_demands(part_nums):
     """Query open job material demands for Starbucks orders only.
+    Uses GetByID method since OData entity queries don't return job materials.
     Returns dict of part_num -> {totalDemand, jobCount, jobs}
     """
     global JOB_DEMANDS_CACHE, JOB_DEMANDS_CACHE_TIME
@@ -361,6 +377,7 @@ def query_all_job_demands(part_nums):
         return JOB_DEMANDS_CACHE
 
     results = {p: {"totalDemand": 0, "jobCount": 0, "jobs": []} for p in part_nums}
+    part_nums_set = set(part_nums)
 
     try:
         # First get Starbucks job numbers
@@ -371,53 +388,74 @@ def query_all_job_demands(part_nums):
             JOB_DEMANDS_CACHE_TIME = datetime.now()
             return results
 
-        # Build filter for all parts at once
-        part_filter = " or ".join([f"PartNum eq '{p}'" for p in part_nums])
+        # Filter to only jobs that produce SBX parts (our finished goods)
+        sbx_finished_goods = {'SBX-22721', 'SBX-22880', 'SBX-24540', 'SBX-24541', 'SBX-24545'}
 
-        # Query JobMtl for all parts in one request - only from open jobs (JobComplete = false)
-        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobMtls"
+        # Query jobs to get their part numbers
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobEntries"
         params = {
-            "$filter": f"({part_filter}) and JobComplete eq false",
-            "$select": "JobNum,PartNum,RequiredQty,IssuedQty,JobComplete",
-            "$top": "500"  # Reasonable limit
+            "$filter": "JobComplete eq false and JobClosed eq false",
+            "$select": "JobNum,PartNum",
+            "$orderby": "JobNum desc",
+            "$top": "2000"
         }
-        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=45)
-        if response.status_code != 200:
-            print(f"JobMtl batch query returned {response.status_code}")
-            return results
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        job_parts = {}
+        if response.status_code == 200:
+            for job in response.json().get("value", []):
+                job_parts[job.get("JobNum", "")] = job.get("PartNum", "")
 
-        data = response.json()
-        if not data.get("value"):
-            JOB_DEMANDS_CACHE = results
-            JOB_DEMANDS_CACHE_TIME = datetime.now()
-            return results
+        # Filter Starbucks jobs to only SBX finished goods
+        sbx_jobs = [j for j in starbucks_jobs if job_parts.get(j, "") in sbx_finished_goods]
+        print(f"Found {len(sbx_jobs)} Starbucks SBX jobs to check for materials")
 
-        # Calculate demands per part - ONLY from Starbucks jobs
-        for mtl in data["value"]:
-            part_num = mtl.get("PartNum", "")
-            job_num = mtl.get("JobNum", "")
+        # Query materials for each SBX job using GetByID (limited to avoid timeout)
+        # Process in parallel for speed
+        def process_job(job_num):
+            materials = get_job_materials_via_getbyid(job_num)
+            job_demands = []
+            for mtl in materials:
+                part_num = mtl.get("PartNum", "")
+                if part_num in part_nums_set:
+                    required = float(mtl.get("RequiredQty", 0) or 0)
+                    issued = float(mtl.get("IssuedQty", 0) or 0)
+                    remaining = max(0, required - issued)
+                    if remaining > 0:
+                        job_demands.append({
+                            "partNum": part_num,
+                            "jobNum": job_num,
+                            "required": required,
+                            "issued": issued,
+                            "remaining": remaining
+                        })
+            return job_demands
 
-            # Skip if not a Starbucks job
-            if job_num not in starbucks_jobs:
-                continue
+        # Process jobs in parallel (limit to 10 at a time)
+        all_demands = []
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(process_job, job): job for job in sbx_jobs[:100]}  # Limit to 100 jobs
+            for future in as_completed(futures):
+                demands = future.result()
+                all_demands.extend(demands)
 
+        # Aggregate demands by part
+        for demand in all_demands:
+            part_num = demand["partNum"]
             if part_num in results:
-                required = float(mtl.get("RequiredQty", 0) or 0)
-                issued = float(mtl.get("IssuedQty", 0) or 0)
-                remaining = max(0, required - issued)
-
-                if remaining > 0:
-                    results[part_num]["totalDemand"] += remaining
-                    results[part_num]["jobs"].append({
-                        "jobNum": job_num,
-                        "required": required,
-                        "issued": issued,
-                        "remaining": remaining
-                    })
+                results[part_num]["totalDemand"] += demand["remaining"]
+                results[part_num]["jobs"].append({
+                    "jobNum": demand["jobNum"],
+                    "required": demand["required"],
+                    "issued": demand["issued"],
+                    "remaining": demand["remaining"]
+                })
 
         # Calculate job counts
         for part_num in results:
             results[part_num]["jobCount"] = len(results[part_num]["jobs"])
+
+        total_demand = sum(r["totalDemand"] for r in results.values())
+        print(f"Total material demands found: {total_demand}")
 
         JOB_DEMANDS_CACHE = results
         JOB_DEMANDS_CACHE_TIME = datetime.now()
