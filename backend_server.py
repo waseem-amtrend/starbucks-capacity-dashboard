@@ -252,70 +252,101 @@ def query_epicor_baq(baq_name, params_dict=None):
         return None
 
 
-def query_epicor_job_demands(part_num):
-    """Query open job material demands for a specific part.
-    Returns total qty required - qty issued for open/released jobs.
+# Global cache for job demands - refreshed per request cycle
+JOB_DEMANDS_CACHE = {}
+JOB_DEMANDS_CACHE_TIME = None
+
+
+def query_all_job_demands(part_nums):
+    """Query ALL open job material demands in a single batch request.
+    Returns dict of part_num -> {totalDemand, jobCount, jobs}
     """
+    global JOB_DEMANDS_CACHE, JOB_DEMANDS_CACHE_TIME
+
+    # If cache is less than 30 seconds old, return it (within same request cycle)
+    if JOB_DEMANDS_CACHE_TIME and (datetime.now() - JOB_DEMANDS_CACHE_TIME).seconds < 30:
+        return JOB_DEMANDS_CACHE
+
+    results = {p: {"totalDemand": 0, "jobCount": 0, "jobs": []} for p in part_nums}
+
     try:
-        # Query JobMtl for this part where job is not complete/closed
-        # We need to join with JobHead to check job status
+        # Build filter for all parts at once
+        part_filter = " or ".join([f"PartNum eq '{p}'" for p in part_nums])
+
+        # Query JobMtl for all parts in one request
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobMtls"
         params = {
-            "$filter": f"PartNum eq '{part_num}'",
-            "$select": "JobNum,PartNum,RequiredQty,IssuedQty,IssueComplete,Description"
+            "$filter": f"({part_filter}) and IssueComplete eq false",
+            "$select": "JobNum,PartNum,RequiredQty,IssuedQty,IssueComplete",
+            "$top": "500"  # Reasonable limit
         }
-        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=45)
         if response.status_code != 200:
-            print(f"JobMtl query returned {response.status_code} for {part_num}")
-            return None
+            print(f"JobMtl batch query returned {response.status_code}")
+            return results
 
         data = response.json()
         if not data.get("value"):
-            return {"partNum": part_num, "totalDemand": 0, "jobs": []}
+            JOB_DEMANDS_CACHE = results
+            JOB_DEMANDS_CACHE_TIME = datetime.now()
+            return results
 
-        # Now we need to check which jobs are open - query JobHead for each unique job
+        # Get unique job numbers
         job_nums = list(set(r.get("JobNum", "") for r in data["value"] if r.get("JobNum")))
-        open_jobs = set()
 
-        if job_nums:
-            # Query JobHead to find open jobs (not complete and not closed)
-            job_filter = " or ".join([f"JobNum eq '{j}'" for j in job_nums[:50]])  # Limit to 50
+        # Query JobHead in batches of 40 to check which are open (OData filter length limit)
+        open_jobs = set()
+        for i in range(0, len(job_nums), 40):
+            batch = job_nums[i:i+40]
+            job_filter = " or ".join([f"JobNum eq '{j}'" for j in batch])
             job_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobHeads"
             job_params = {
                 "$filter": f"({job_filter}) and JobComplete eq false and JobClosed eq false",
-                "$select": "JobNum,PartNum,ProdQty,JobReleased"
+                "$select": "JobNum"
             }
             job_response = requests.get(job_url, headers=get_epicor_headers(), params=job_params, timeout=30)
             if job_response.status_code == 200:
                 job_data = job_response.json()
-                open_jobs = set(j.get("JobNum", "") for j in job_data.get("value", []))
+                open_jobs.update(j.get("JobNum", "") for j in job_data.get("value", []))
 
-        # Calculate total demand from open jobs only
-        total_demand = 0
-        job_details = []
+        # Calculate demands per part from open jobs only
         for mtl in data["value"]:
+            part_num = mtl.get("PartNum", "")
             job_num = mtl.get("JobNum", "")
-            if job_num in open_jobs and not mtl.get("IssueComplete", False):
+
+            if part_num in results and job_num in open_jobs:
                 required = float(mtl.get("RequiredQty", 0) or 0)
                 issued = float(mtl.get("IssuedQty", 0) or 0)
                 remaining = max(0, required - issued)
+
                 if remaining > 0:
-                    total_demand += remaining
-                    job_details.append({
+                    results[part_num]["totalDemand"] += remaining
+                    results[part_num]["jobs"].append({
                         "jobNum": job_num,
                         "required": required,
                         "issued": issued,
                         "remaining": remaining
                     })
 
-        return {
-            "partNum": part_num,
-            "totalDemand": total_demand,
-            "jobs": job_details
-        }
+        # Calculate job counts
+        for part_num in results:
+            results[part_num]["jobCount"] = len(results[part_num]["jobs"])
+
+        JOB_DEMANDS_CACHE = results
+        JOB_DEMANDS_CACHE_TIME = datetime.now()
+        return results
+
     except requests.exceptions.RequestException as e:
-        print(f"Error querying job demands for {part_num}: {e}")
-        return None
+        print(f"Error querying batch job demands: {e}")
+        return results
+
+
+def query_epicor_job_demands(part_num):
+    """Query open job material demands for a specific part (uses cache from batch query)."""
+    # This is now just a lookup from the batch cache
+    if JOB_DEMANDS_CACHE and part_num in JOB_DEMANDS_CACHE:
+        return JOB_DEMANDS_CACHE[part_num]
+    return {"totalDemand": 0, "jobCount": 0, "jobs": []}
 
 
 def fetch_part_inventory(part_num):
@@ -390,6 +421,9 @@ def get_inventory():
     components = get_all_components()
     inventory_data = {}
     errors = []
+
+    # Pre-fetch all job demands in batch (2 API calls instead of 2 per part)
+    query_all_job_demands(components)
 
     # Use ThreadPoolExecutor for parallel requests (max 5 concurrent to avoid rate limiting)
     with ThreadPoolExecutor(max_workers=5) as executor:
