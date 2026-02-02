@@ -10,6 +10,7 @@ from requests.auth import HTTPBasicAuth
 import os
 from datetime import datetime
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
@@ -235,6 +236,53 @@ def query_epicor_baq(baq_name, params_dict=None):
         return None
 
 
+def fetch_part_inventory(part_num):
+    """Fetch inventory and part info for a single part - used for parallel execution"""
+    whse_result = query_epicor_partwhse(part_num)
+    part_result = query_epicor_part(part_num)
+
+    description = ""
+    uom = "EA"
+    if part_result and "value" in part_result and len(part_result["value"]) > 0:
+        part_info = part_result["value"][0]
+        description = part_info.get("PartDescription", "")
+        uom = part_info.get("IUM", "EA")
+
+    if whse_result and "value" in whse_result and len(whse_result["value"]) > 0:
+        total_on_hand = sum(float(r.get("OnHandQty", 0) or 0) for r in whse_result["value"])
+        total_allocated = sum(float(r.get("AllocatedQty", 0) or 0) for r in whse_result["value"])
+        available = total_on_hand - total_allocated
+
+        return {
+            "partNum": part_num,
+            "description": description,
+            "onHand": total_on_hand,
+            "allocated": total_allocated,
+            "available": available,
+            "uom": uom,
+            "warehouses": [
+                {
+                    "warehouseCode": r.get("WarehouseCode", ""),
+                    "onHand": float(r.get("OnHandQty", 0) or 0),
+                    "allocated": float(r.get("AllocatedQty", 0) or 0)
+                }
+                for r in whse_result["value"]
+            ],
+            "error": None
+        }
+    else:
+        return {
+            "partNum": part_num,
+            "description": description,
+            "onHand": 0,
+            "allocated": 0,
+            "available": 0,
+            "uom": uom,
+            "warehouses": [],
+            "error": "Failed to fetch inventory from Epicor"
+        }
+
+
 @app.route('/api/inventory', methods=['GET'])
 def get_inventory():
     """Query current inventory from Epicor for all BOM components - REAL-TIME DATA ONLY"""
@@ -242,55 +290,30 @@ def get_inventory():
     inventory_data = {}
     errors = []
 
-    for part_num in components:
-        # Get inventory quantities from PartWhses
-        whse_result = query_epicor_partwhse(part_num)
+    # Use ThreadPoolExecutor for parallel requests (max 5 concurrent to avoid rate limiting)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_part = {executor.submit(fetch_part_inventory, part): part for part in components}
 
-        # Get part master info (description, UOM) from Parts
-        part_result = query_epicor_part(part_num)
-
-        # Extract part info
-        description = ""
-        uom = "EA"
-        if part_result and "value" in part_result and len(part_result["value"]) > 0:
-            part_info = part_result["value"][0]
-            description = part_info.get("PartDescription", "")
-            uom = part_info.get("IUM", "EA")
-
-        if whse_result and "value" in whse_result and len(whse_result["value"]) > 0:
-            # Sum up inventory across warehouses - ensure numeric conversion
-            total_on_hand = sum(float(r.get("OnHandQty", 0) or 0) for r in whse_result["value"])
-            total_allocated = sum(float(r.get("AllocatedQty", 0) or 0) for r in whse_result["value"])
-            available = total_on_hand - total_allocated
-
-            inventory_data[part_num] = {
-                "partNum": part_num,
-                "description": description,
-                "onHand": total_on_hand,
-                "allocated": total_allocated,
-                "available": available,
-                "uom": uom,
-                "warehouses": [
-                    {
-                        "warehouseCode": r.get("WarehouseCode", ""),
-                        "onHand": float(r.get("OnHandQty", 0) or 0),
-                        "allocated": float(r.get("AllocatedQty", 0) or 0)
-                    }
-                    for r in whse_result["value"]
-                ]
-            }
-        else:
-            errors.append(part_num)
-            inventory_data[part_num] = {
-                "partNum": part_num,
-                "description": description,
-                "onHand": 0,
-                "allocated": 0,
-                "available": 0,
-                "uom": uom,
-                "warehouses": [],
-                "error": "Failed to fetch inventory from Epicor"
-            }
+        for future in as_completed(future_to_part):
+            part_num = future_to_part[future]
+            try:
+                result = future.result()
+                inventory_data[part_num] = result
+                if result.get("error"):
+                    errors.append(part_num)
+            except Exception as e:
+                print(f"Error fetching inventory for {part_num}: {e}")
+                errors.append(part_num)
+                inventory_data[part_num] = {
+                    "partNum": part_num,
+                    "description": "",
+                    "onHand": 0,
+                    "allocated": 0,
+                    "available": 0,
+                    "uom": "EA",
+                    "warehouses": [],
+                    "error": str(e)
+                }
 
     return jsonify({
         "success": len(errors) == 0,
