@@ -256,9 +256,38 @@ def query_epicor_baq(baq_name, params_dict=None):
 JOB_DEMANDS_CACHE = {}
 JOB_DEMANDS_CACHE_TIME = None
 
+# Starbucks Customer Number - CustID 11-1000
+STARBUCKS_CUST_NUM = 272
+
+
+def get_starbucks_open_jobs():
+    """Get list of open job numbers for Starbucks customer (CustNum 272).
+    Returns set of job numbers like {'024266-1-1', '024189-1-1', ...}
+    """
+    try:
+        # Query JobEntry for open jobs linked to Starbucks via XRefCustNum
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobEntries"
+        params = {
+            "$filter": f"XRefCustNum eq {STARBUCKS_CUST_NUM} and JobComplete eq false and JobClosed eq false",
+            "$select": "JobNum,PartNum,XRefCustNum",
+            "$top": "200"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            jobs = set(j.get("JobNum", "") for j in data.get("value", []) if j.get("JobNum"))
+            print(f"Found {len(jobs)} open jobs for Starbucks (XRefCustNum {STARBUCKS_CUST_NUM})")
+            return jobs
+        else:
+            print(f"JobEntry query returned {response.status_code}: {response.text[:200]}")
+    except Exception as e:
+        print(f"Error getting Starbucks jobs: {e}")
+
+    return set()
+
 
 def query_all_job_demands(part_nums):
-    """Query ALL open job material demands in a single batch request.
+    """Query open job material demands for Starbucks orders only.
     Returns dict of part_num -> {totalDemand, jobCount, jobs}
     """
     global JOB_DEMANDS_CACHE, JOB_DEMANDS_CACHE_TIME
@@ -270,6 +299,14 @@ def query_all_job_demands(part_nums):
     results = {p: {"totalDemand": 0, "jobCount": 0, "jobs": []} for p in part_nums}
 
     try:
+        # First get Starbucks job numbers
+        starbucks_jobs = get_starbucks_open_jobs()
+        if not starbucks_jobs:
+            print("No Starbucks jobs found - no demands to track")
+            JOB_DEMANDS_CACHE = results
+            JOB_DEMANDS_CACHE_TIME = datetime.now()
+            return results
+
         # Build filter for all parts at once
         part_filter = " or ".join([f"PartNum eq '{p}'" for p in part_nums])
 
@@ -291,10 +328,14 @@ def query_all_job_demands(part_nums):
             JOB_DEMANDS_CACHE_TIME = datetime.now()
             return results
 
-        # Calculate demands per part directly - we already filtered for JobComplete eq false
+        # Calculate demands per part - ONLY from Starbucks jobs
         for mtl in data["value"]:
             part_num = mtl.get("PartNum", "")
             job_num = mtl.get("JobNum", "")
+
+            # Skip if not a Starbucks job
+            if job_num not in starbucks_jobs:
+                continue
 
             if part_num in results:
                 required = float(mtl.get("RequiredQty", 0) or 0)
