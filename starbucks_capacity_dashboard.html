@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Starbucks Vendor Direct Inventory - Amtrend</title>
+    <title>Starbucks Vendor Direct Inventory - Amtrend Corporation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gotham:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,14 +12,57 @@
             box-sizing: border-box;
         }
 
+        :root {
+            /* Amtrend Brand Colors */
+            --amtrend-blue: #0072CE;
+            --amtrend-grey-dark: #666666;
+            --amtrend-grey-med: #999999;
+            --amtrend-grey-light: #B3B3B3;
+            --amtrend-grey-pale: #E6E6E6;
+            /* Starbucks Brand Colors */
+            --starbucks-green: #00704a;
+            --starbucks-green-dark: #006241;
+            --starbucks-dark: #1e3932;
+        }
+
         body {
-            font-family: 'Lander', 'SoDoSans', Helvetica, Arial, sans-serif;
+            font-family: 'Gotham', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             background: #f7f7f7;
-            color: #1e3932;
+            color: var(--starbucks-dark);
+        }
+
+        /* Amtrend Top Bar */
+        .amtrend-bar {
+            background: linear-gradient(135deg, var(--amtrend-blue) 0%, #005fa3 100%);
+            color: white;
+            padding: 8px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .amtrend-bar .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            letter-spacing: 2px;
+        }
+
+        .amtrend-bar .tagline {
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        /* Amtrend Logo SVG */
+        .amtrend-logo {
+            height: 24px;
+            width: auto;
         }
 
         .header {
-            background: linear-gradient(135deg, #00704a 0%, #006241 100%);
+            background: linear-gradient(135deg, var(--starbucks-green) 0%, var(--starbucks-green-dark) 100%);
             color: white;
             padding: 24px 40px;
             display: flex;
@@ -36,7 +80,7 @@
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            color: #00704a;
+            color: var(--starbucks-green);
             font-size: 24px;
         }
 
@@ -46,13 +90,15 @@
 
         .header h1 {
             font-size: 24px;
-            font-weight: 600;
+            font-weight: 500;
             margin-bottom: 4px;
+            letter-spacing: 0.5px;
         }
 
         .header p {
             font-size: 14px;
             opacity: 0.95;
+            font-weight: 300;
         }
 
         .controls {
@@ -490,6 +536,60 @@
         .error-message.show {
             display: block;
         }
+
+        /* Amtrend Footer */
+        .amtrend-footer {
+            background: var(--starbucks-dark);
+            color: white;
+            padding: 30px 40px;
+            margin-top: 40px;
+        }
+
+        .footer-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .footer-brand .logo-text {
+            font-size: 18px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            color: var(--amtrend-blue);
+        }
+
+        .footer-info {
+            font-size: 12px;
+            opacity: 0.8;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .footer-info strong {
+            color: var(--amtrend-blue);
+            font-weight: 500;
+        }
+
+        .footer-tech {
+            font-size: 11px;
+            opacity: 0.6;
+            text-align: right;
+        }
+
+        .footer-tech a {
+            color: var(--amtrend-blue);
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -500,12 +600,22 @@
         </div>
     </div>
 
+    <!-- Amtrend Top Bar -->
+    <div class="amtrend-bar">
+        <div class="brand">
+            <svg class="amtrend-logo" viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
+                <text x="0" y="35" fill="white" font-family="Gotham, Arial" font-size="24" font-weight="300" letter-spacing="3">AMTREND</text>
+            </svg>
+        </div>
+        <div class="tagline">Vendor Direct Inventory Management System</div>
+    </div>
+
     <div class="header">
         <div class="logo">&#9733;</div>
         <div class="header-content">
             <h1>Starbucks Vendor Direct Inventory Dashboard</h1>
             <p>Real-time production capacity analysis - Master Quote: 109209</p>
-            <div style="margin-top: 12px; font-size: 12px; opacity: 0.9;">
+            <div style="margin-top: 12px; font-size: 12px; opacity: 0.9; font-weight: 300;">
                 SKU Mapping: 11174933&#8594;SBX-22721 | 11174935&#8594;SBX-24545 | 11174936&#8594;SBX-24540 | 11174937&#8594;SBX-22880 | 11174939&#8594;SBX-24541
             </div>
         </div>
@@ -931,5 +1041,29 @@
             setInterval(refreshData, 5 * 60 * 1000);
         });
     </script>
+
+    <!-- Amtrend Footer -->
+    <footer class="amtrend-footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <svg viewBox="0 0 60 60" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="30" cy="30" r="20" fill="none" stroke="#666" stroke-width="2"/>
+                    <line x1="15" y1="45" x2="45" y2="15" stroke="#0072CE" stroke-width="3" stroke-linecap="round" stroke-dasharray="4,3"/>
+                    <line x1="40" y1="20" x2="40" y2="40" stroke="#666" stroke-width="2"/>
+                </svg>
+                <span class="logo-text">AMTREND</span>
+            </div>
+            <div class="footer-info">
+                <strong>Amtrend Corporation</strong><br>
+                255 S. King Street, Seattle, WA 98104<br>
+                Contract Furniture Manufacturing - Made in California
+            </div>
+            <div class="footer-tech">
+                Powered by <strong>Epicor Kinetic ERP</strong><br>
+                Real-time inventory via REST API<br>
+                <a href="/health">System Status</a>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>
