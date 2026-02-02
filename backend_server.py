@@ -273,11 +273,11 @@ def query_all_job_demands(part_nums):
         # Build filter for all parts at once
         part_filter = " or ".join([f"PartNum eq '{p}'" for p in part_nums])
 
-        # Query JobMtl for all parts in one request
+        # Query JobMtl for all parts in one request - only from open jobs (JobComplete = false)
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobMtls"
         params = {
-            "$filter": f"({part_filter}) and IssueComplete eq false",
-            "$select": "JobNum,PartNum,RequiredQty,IssuedQty,IssueComplete",
+            "$filter": f"({part_filter}) and JobComplete eq false",
+            "$select": "JobNum,PartNum,RequiredQty,IssuedQty,JobComplete",
             "$top": "500"  # Reasonable limit
         }
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=45)
@@ -291,30 +291,12 @@ def query_all_job_demands(part_nums):
             JOB_DEMANDS_CACHE_TIME = datetime.now()
             return results
 
-        # Get unique job numbers
-        job_nums = list(set(r.get("JobNum", "") for r in data["value"] if r.get("JobNum")))
-
-        # Query JobHead in batches of 40 to check which are open (OData filter length limit)
-        open_jobs = set()
-        for i in range(0, len(job_nums), 40):
-            batch = job_nums[i:i+40]
-            job_filter = " or ".join([f"JobNum eq '{j}'" for j in batch])
-            job_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobHeads"
-            job_params = {
-                "$filter": f"({job_filter}) and JobComplete eq false and JobClosed eq false",
-                "$select": "JobNum"
-            }
-            job_response = requests.get(job_url, headers=get_epicor_headers(), params=job_params, timeout=30)
-            if job_response.status_code == 200:
-                job_data = job_response.json()
-                open_jobs.update(j.get("JobNum", "") for j in job_data.get("value", []))
-
-        # Calculate demands per part from open jobs only
+        # Calculate demands per part directly - we already filtered for JobComplete eq false
         for mtl in data["value"]:
             part_num = mtl.get("PartNum", "")
             job_num = mtl.get("JobNum", "")
 
-            if part_num in results and job_num in open_jobs:
+            if part_num in results:
                 required = float(mtl.get("RequiredQty", 0) or 0)
                 issued = float(mtl.get("IssuedQty", 0) or 0)
                 remaining = max(0, required - issued)
