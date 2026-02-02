@@ -655,15 +655,8 @@
         </div>
 
         <div class="section">
-            <h2 class="section-title">Production Capacity by SKU</h2>
-            <div class="sku-grid" id="skuGrid">
-                <!-- SKU cards populated by JS -->
-            </div>
-        </div>
-
-        <div class="section">
             <div class="inventory-section">
-                <h2 class="section-title">Raw Material Inventory Summary</h2>
+                <h2 class="section-title">Raw Material Inventory</h2>
                 <table class="inventory-table" id="inventoryTable">
                     <thead>
                         <tr>
@@ -672,8 +665,8 @@
                             <th>Type</th>
                             <th>On Hand</th>
                             <th>Available</th>
-                            <th>Incoming POs</th>
-                            <th>Future Total</th>
+                            <th>Incoming</th>
+                            <th>Future</th>
                             <th>UOM</th>
                             <th>Status</th>
                         </tr>
@@ -682,6 +675,13 @@
                         <!-- Rows populated by JS -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Production Capacity by SKU</h2>
+            <div class="sku-grid" id="skuGrid">
+                <!-- SKU cards populated by JS -->
             </div>
         </div>
     </div>
@@ -838,7 +838,7 @@
             }
         }
 
-        // Render SKU cards
+        // Render SKU cards - simplified view without PO details
         function renderSkuCards(data) {
             const grid = document.getElementById('skuGrid');
             grid.innerHTML = '';
@@ -854,34 +854,22 @@
 
                 const isBlocked = skuData.maxProductionNow === 0;
 
-                // Build BOM rows
+                // Build simplified BOM rows - no PO details
                 let bomRows = '';
                 skuData.bottlenecks.forEach(b => {
                     const incomingHtml = b.incomingQty > 0
                         ? `<span class="po-badge">+${formatNumber(b.incomingQty)}</span>`
                         : '-';
 
-                    // Build PO details
-                    let poDetails = '';
-                    if (b.pos && b.pos.length > 0) {
-                        poDetails = b.pos.map(po =>
-                            `PO ${po.poNum}: ${formatNumber(po.remainQty)} ${b.uom} (${formatDate(po.dueDate)}) - ${po.vendorName}`
-                        ).join('<br>');
-                    }
-
                     bomRows += `
                         <tr>
-                            <td>
-                                <strong>${b.component}</strong>
-                                ${poDetails ? `<div class="po-details">${poDetails}</div>` : ''}
-                            </td>
+                            <td><strong>${b.component}</strong></td>
                             <td><span class="component-type ${b.type.toLowerCase()}">${b.type}</span></td>
                             <td>${formatNumber(b.qtyPer)} ${b.uom}</td>
                             <td>${formatNumber(b.available)}</td>
                             <td>${incomingHtml}</td>
                             <td><strong>${formatNumber(b.futureAvailable)}</strong></td>
                             <td>${getStatusBadge(b.available, b.maxUnitsNow)}</td>
-                            <td>${b.maxUnitsNow} &#8594; ${b.maxUnitsFuture}</td>
                         </tr>
                     `;
                 });
@@ -890,20 +878,20 @@
                     <div class="sku-header">
                         <div class="sku-title">
                             <span class="starbucks-sku">SKU: ${skuData.starbucksPartNum}</span>
-                            <span class="amtrend-part">&#8594; Amtrend Part: ${sku}</span>
+                            <span class="amtrend-part">&#8594; ${sku}</span>
                         </div>
-                        <div class="sku-subtitle">${skuData.description} - Quote ${skuData.quoteLine}</div>
+                        <div class="sku-subtitle">${skuData.description}</div>
 
                         <div class="capacity-grid">
                             <div class="capacity-box">
                                 <div class="capacity-label">Current Capacity</div>
                                 <div class="capacity-number ${isBlocked ? 'blocked' : ''}">${skuData.maxProductionNow}</div>
-                                <div class="limiting-component">${isBlocked ? '&#128683; BLOCKED' : '&#128200;'} Limiting: ${skuData.limitingComponentNow}</div>
+                                <div class="limiting-component">${isBlocked ? 'BLOCKED by ' : 'Limited by '} ${skuData.limitingComponentNow}</div>
                             </div>
                             <div class="capacity-box">
-                                <div class="capacity-label">Future Capacity (with POs)</div>
+                                <div class="capacity-label">Future Capacity</div>
                                 <div class="capacity-number">${skuData.maxProductionFuture}</div>
-                                <div class="limiting-component">&#128200; +${skuData.maxProductionFuture - skuData.maxProductionNow} units - Limiting: ${skuData.limitingComponentFuture}</div>
+                                <div class="limiting-component">With incoming POs</div>
                             </div>
                         </div>
                     </div>
@@ -913,12 +901,11 @@
                             <tr>
                                 <th>Component</th>
                                 <th>Type</th>
-                                <th>Req'd/Unit</th>
+                                <th>Qty/Unit</th>
                                 <th>Available</th>
                                 <th>Incoming</th>
                                 <th>Future</th>
                                 <th>Status</th>
-                                <th>Max Units</th>
                             </tr>
                         </thead>
                         <tbody>

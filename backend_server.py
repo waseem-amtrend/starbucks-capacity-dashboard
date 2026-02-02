@@ -476,8 +476,7 @@ def calculate_capacity():
                 "maxUnitsFuture": max_units_future,
                 "uom": details["uom"],
                 "type": details["type"],
-                "status": status,
-                "pos": component_pos
+                "status": status
             })
 
         # Find limiting components
