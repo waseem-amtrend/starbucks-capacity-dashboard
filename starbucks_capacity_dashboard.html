@@ -1009,9 +1009,9 @@
                         &#8635; Refresh Transactions
                     </button>
                 </div>
-                <div id="transactionTableContainer">
+                <div id="transactionTableContainer" style="max-height: 500px; overflow-y: auto; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
                     <table class="transaction-table">
-                        <thead>
+                        <thead style="position: sticky; top: 0; z-index: 1;">
                             <tr>
                                 <th>Date</th>
                                 <th>Type</th>
@@ -1427,11 +1427,47 @@
 
         // Load all tracking data
         async function loadTrackingData() {
+            // Populate part dropdown first
+            populatePartDropdown();
+
             await Promise.all([
                 loadTransactions(),
                 loadJobMaterials()
             ]);
             trackingDataLoaded = true;
+        }
+
+        // Populate part dropdown with BOM components
+        function populatePartDropdown() {
+            const partDropdown = document.getElementById('partFilter');
+            if (partDropdown.options.length > 1) return; // Already populated
+
+            // Get parts from capacityData if available
+            if (capacityData) {
+                const allParts = new Set();
+                Object.values(capacityData).forEach(sku => {
+                    sku.bottlenecks.forEach(b => allParts.add(b.component));
+                });
+                Array.from(allParts).sort().forEach(part => {
+                    const option = document.createElement('option');
+                    option.value = part;
+                    option.textContent = part;
+                    partDropdown.appendChild(option);
+                });
+            } else {
+                // Fallback: Add known BOM parts manually
+                const bomParts = [
+                    'CTNS-117', 'CTNS-118', 'FOAM-170', 'FOAM-171',
+                    'LEA-SBX14', 'LEA-SBX15', 'LEA-SBX16',
+                    'POLB-129', 'SBX-118', 'SBX-119'
+                ];
+                bomParts.forEach(part => {
+                    const option = document.createElement('option');
+                    option.value = part;
+                    option.textContent = part;
+                    partDropdown.appendChild(option);
+                });
+            }
         }
 
         // Fetch and render transactions
@@ -1454,21 +1490,6 @@
                 if (result.success) {
                     transactionsData = result.data || [];
                     renderTransactionTable(transactionsData);
-
-                    // Populate part filter dropdown if empty - fetch from capacity API
-                    const partDropdown = document.getElementById('partFilter');
-                    if (partDropdown.options.length <= 1 && capacityData) {
-                        const allParts = new Set();
-                        Object.values(capacityData).forEach(sku => {
-                            sku.bottlenecks.forEach(b => allParts.add(b.component));
-                        });
-                        Array.from(allParts).sort().forEach(part => {
-                            const option = document.createElement('option');
-                            option.value = part;
-                            option.textContent = part;
-                            partDropdown.appendChild(option);
-                        });
-                    }
                 } else {
                     tbody.innerHTML = `<tr><td colspan="7" class="tracking-loading" style="color: #dc3545;">Error: ${result.error}</td></tr>`;
                 }
