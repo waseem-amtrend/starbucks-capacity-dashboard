@@ -1584,8 +1584,8 @@
                 let missingCount = 0;
 
                 const materialsHtml = (job.materials || []).map(m => {
-                    const required = m.requiredQty || 0;
-                    const issued = m.issuedQty || 0;
+                    const required = m.required || 0;
+                    const issued = m.issued || 0;
                     let statusIcon = '';
                     let statusClass = '';
 
@@ -1629,7 +1629,7 @@
                     jobStatusLabel = `${partialCount} Partial`;
                 }
 
-                const dueDate = job.dueDate ? formatDate(job.dueDate) : '-';
+                const shipByDate = job.shipByDate ? formatDate(job.shipByDate) : (job.dueDate ? formatDate(job.dueDate) : '-');
 
                 return `
                     <div class="job-card">
@@ -1642,7 +1642,7 @@
                             ${materialsHtml || '<div class="tracking-loading">No materials found</div>'}
                         </div>
                         <div class="job-card-footer">
-                            <span>Due: ${dueDate}</span>
+                            <span>Ship By: ${shipByDate}</span>
                             <span class="job-status-badge ${jobStatusClass}">${jobStatusLabel}</span>
                         </div>
                     </div>

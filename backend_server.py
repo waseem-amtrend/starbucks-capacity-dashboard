@@ -1053,6 +1053,61 @@ def get_job_materials():
             for job in response.json().get("value", []):
                 job_info[job.get("JobNum", "")] = job
 
+        # Get ship-by dates from JobProd -> OrderRel
+        # Query JobProd to get order links for our jobs
+        job_ship_dates = {}
+        try:
+            job_prod_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobProds"
+            job_nums_filter = " or ".join([f"JobNum eq '{j}'" for j in list(starbucks_jobs)[:100]])
+            job_prod_params = {
+                "$filter": f"({job_nums_filter})",
+                "$select": "JobNum,OrderNum,OrderLine,OrderRelNum"
+            }
+            job_prod_response = requests.get(job_prod_url, headers=get_epicor_headers(), params=job_prod_params, timeout=30)
+
+            if job_prod_response.status_code == 200:
+                job_prods = job_prod_response.json().get("value", [])
+
+                # Build map of JobNum -> OrderNum/Line/Rel
+                job_to_order = {}
+                order_keys = set()
+                for jp in job_prods:
+                    job_num = jp.get("JobNum", "")
+                    order_num = jp.get("OrderNum")
+                    order_line = jp.get("OrderLine")
+                    order_rel = jp.get("OrderRelNum")
+                    if order_num and order_line:
+                        job_to_order[job_num] = (order_num, order_line, order_rel or 1)
+                        order_keys.add((order_num, order_line, order_rel or 1))
+
+                # Query OrderRel for NeedByDate
+                if order_keys:
+                    # Build filter for order releases (limit to first 50 to avoid query size issues)
+                    order_filters = []
+                    for order_num, order_line, order_rel in list(order_keys)[:50]:
+                        order_filters.append(f"(OrderNum eq {order_num} and OrderLine eq {order_line} and OrderRelNum eq {order_rel})")
+
+                    order_rel_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.SalesOrderSvc/OrderRels"
+                    order_rel_params = {
+                        "$filter": " or ".join(order_filters),
+                        "$select": "OrderNum,OrderLine,OrderRelNum,NeedByDate,ReqDate"
+                    }
+                    order_rel_response = requests.get(order_rel_url, headers=get_epicor_headers(), params=order_rel_params, timeout=30)
+
+                    if order_rel_response.status_code == 200:
+                        order_rels = order_rel_response.json().get("value", [])
+                        order_date_map = {}
+                        for orel in order_rels:
+                            key = (orel.get("OrderNum"), orel.get("OrderLine"), orel.get("OrderRelNum"))
+                            order_date_map[key] = orel.get("NeedByDate") or orel.get("ReqDate")
+
+                        # Map back to jobs
+                        for job_num, order_key in job_to_order.items():
+                            if order_key in order_date_map:
+                                job_ship_dates[job_num] = order_date_map[order_key]
+        except Exception as e:
+            print(f"Error fetching ship dates: {e}")
+
         # Filter to SBX jobs only
         sbx_jobs = [j for j in starbucks_jobs if job_info.get(j, {}).get("PartNum", "") in sbx_finished_goods]
 
@@ -1108,6 +1163,7 @@ def get_job_materials():
                 "prodQty": float(info.get("ProdQty", 0) or 0),
                 "startDate": info.get("StartDate", ""),
                 "dueDate": info.get("ReqDueDate", ""),
+                "shipByDate": job_ship_dates.get(job_num, ""),
                 "materials": material_rows,
                 "materialCount": len(material_rows),
                 "status": job_status
