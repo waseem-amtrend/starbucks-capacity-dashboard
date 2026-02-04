@@ -203,7 +203,7 @@ def get_epicor_headers():
 
 
 def query_epicor_partwhse(part_num):
-    """Query inventory for a specific part - tries PartWhses then falls back to PartCostSearches"""
+    """Query inventory for a specific part - tries PartWhses, then PartBins, then PartCostSearches"""
     # First try PartSvc/PartWhses
     try:
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/PartWhses"
@@ -215,11 +215,54 @@ def query_epicor_partwhse(part_num):
         if response.status_code == 200:
             data = response.json()
             if data.get("value") and len(data["value"]) > 0:
-                return data
+                # Check if we have actual inventory (OnHandQty > 0)
+                total_on_hand = sum(float(r.get("OnHandQty", 0) or 0) for r in data["value"])
+                if total_on_hand > 0:
+                    return data
     except requests.exceptions.RequestException as e:
         print(f"Error querying PartWhse for {part_num}: {e}")
 
-    # Fallback: Use PartCostSearchSvc to get TotalQtyAvg (on-hand quantity for average costing)
+    # Fallback 1: Use PartBins to get inventory by bin (more reliable for parts with bin tracking)
+    # This is needed for parts like FOAM-170/171 stored in "Main Inventory" warehouse, "FOAM" bin
+    try:
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartSvc/PartBins"
+        params = {
+            "$filter": f"PartNum eq '{part_num}'",
+            "$select": "PartNum,WarehouseCode,BinNum,OnhandQty"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("value") and len(data["value"]) > 0:
+                # Aggregate inventory across bins by warehouse
+                warehouse_totals = {}
+                for bin_record in data["value"]:
+                    whse = bin_record.get("WarehouseCode", "MAIN")
+                    qty = float(bin_record.get("OnhandQty", 0) or 0)
+                    if whse not in warehouse_totals:
+                        warehouse_totals[whse] = 0
+                    warehouse_totals[whse] += qty
+
+                # Only return if we found inventory
+                total_qty = sum(warehouse_totals.values())
+                if total_qty > 0:
+                    print(f"Found {part_num} inventory via PartBins: {total_qty} in warehouses {warehouse_totals}")
+                    # Return in the same format as PartWhses
+                    return {
+                        "value": [
+                            {
+                                "PartNum": part_num,
+                                "WarehouseCode": whse,
+                                "OnHandQty": qty,
+                                "AllocatedQty": 0
+                            }
+                            for whse, qty in warehouse_totals.items() if qty > 0
+                        ]
+                    }
+    except requests.exceptions.RequestException as e:
+        print(f"Error querying PartBins for {part_num}: {e}")
+
+    # Fallback 2: Use PartCostSearchSvc to get TotalQtyAvg (on-hand quantity for average costing)
     try:
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartCostSearchSvc/PartCostSearches"
         params = {
@@ -232,15 +275,16 @@ def query_epicor_partwhse(part_num):
             data = response.json()
             if data.get("value") and len(data["value"]) > 0:
                 qty = float(data["value"][0].get("TotalQtyAvg", 0) or 0)
-                # Return synthetic warehouse record matching the format
-                return {
-                    "value": [{
-                        "PartNum": part_num,
-                        "WarehouseCode": "TOTAL",
-                        "OnHandQty": qty,
-                        "AllocatedQty": 0
-                    }]
-                }
+                if qty > 0:
+                    # Return synthetic warehouse record matching the format
+                    return {
+                        "value": [{
+                            "PartNum": part_num,
+                            "WarehouseCode": "TOTAL",
+                            "OnHandQty": qty,
+                            "AllocatedQty": 0
+                        }]
+                    }
     except requests.exceptions.RequestException as e:
         print(f"Error querying PartCostSearch for {part_num}: {e}")
 
