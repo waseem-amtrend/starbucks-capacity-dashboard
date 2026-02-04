@@ -976,26 +976,39 @@ def get_transactions():
 
         for record in data.get("value", []):
             tran_type = record.get("TranType", "")
-            # Classify transaction type for UI display
-            if tran_type in ["STK-MTL", "MTL-STK"]:
-                type_label = "Issue to Job" if tran_type == "STK-MTL" else "Return from Job"
+            raw_qty = float(record.get("TranQty", 0) or 0)
+
+            # Classify transaction type and determine sign for display
+            # Issues to jobs should be NEGATIVE (consuming inventory)
+            # Receipts should be POSITIVE (adding inventory)
+            # Adjustments keep their natural sign
+            if tran_type == "STK-MTL":
+                type_label = "Issue to Job"
                 type_class = "issue"
+                display_qty = -abs(raw_qty)  # Always negative for issues
+            elif tran_type == "MTL-STK":
+                type_label = "Return from Job"
+                type_class = "receipt"
+                display_qty = abs(raw_qty)  # Always positive for returns
             elif tran_type in ["PUR-STK", "REC-STK"]:
                 type_label = "Receipt"
                 type_class = "receipt"
+                display_qty = abs(raw_qty)  # Always positive for receipts
             elif tran_type in ["ADJ-QTY", "ADJ-CST"]:
                 type_label = "Adjustment"
                 type_class = "adjustment"
+                display_qty = raw_qty  # Keep natural sign for adjustments
             else:
                 type_label = tran_type
                 type_class = "other"
+                display_qty = raw_qty
 
             transactions.append({
                 "date": record.get("TranDate", ""),
                 "type": tran_type,
                 "typeLabel": type_label,
                 "typeClass": type_class,
-                "qty": float(record.get("TranQty", 0) or 0),
+                "qty": display_qty,
                 "jobNum": record.get("JobNum", ""),
                 "partNum": record.get("PartNum", ""),
                 "partDescription": record.get("PartDescription", ""),
@@ -1158,8 +1171,11 @@ def get_job_materials():
                 except Exception as e:
                     print(f"Error processing job: {e}")
 
-        # Sort by job number descending
-        job_cards.sort(key=lambda x: x["jobNum"], reverse=True)
+        # Sort by ship date ascending (earliest first), then by job number
+        def sort_key(job):
+            ship_date = job.get("shipByDate") or job.get("dueDate") or "9999-12-31"
+            return (ship_date, job.get("jobNum", ""))
+        job_cards.sort(key=sort_key)
 
         return jsonify({
             "success": True,
