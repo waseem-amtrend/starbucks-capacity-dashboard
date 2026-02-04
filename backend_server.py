@@ -1108,14 +1108,31 @@ def get_job_materials():
             else:
                 job_status = "missing"
 
-            # Get ship-by date from JobProd (linked to OrderRel)
+            # Get ship-by date from JobProd -> OrderRel
             ship_by_date = ""
             if job_prods:
-                # JobProd contains the link to OrderRel which has ship date
-                # The first JobProd usually has the order reference
+                # JobProd contains OrderNum, OrderLine, OrderRelNum - use these to get NeedByDate
                 first_prod = job_prods[0] if job_prods else {}
-                # Try to get NeedByDate directly from JobProd if available
-                ship_by_date = first_prod.get("NeedByDate", "") or first_prod.get("ReqDueDate", "")
+                order_num = first_prod.get("OrderNum")
+                order_line = first_prod.get("OrderLine")
+                order_rel = first_prod.get("OrderRelNum", 1)
+
+                if order_num and order_line:
+                    try:
+                        # Query OrderRel for NeedByDate
+                        order_rel_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.SalesOrderSvc/OrderRels"
+                        order_rel_params = {
+                            "$filter": f"OrderNum eq {order_num} and OrderLine eq {order_line} and OrderRelNum eq {order_rel}",
+                            "$select": "NeedByDate,ReqDate",
+                            "$top": "1"
+                        }
+                        order_rel_resp = requests.get(order_rel_url, headers=get_epicor_headers(), params=order_rel_params, timeout=10)
+                        if order_rel_resp.status_code == 200:
+                            order_rels = order_rel_resp.json().get("value", [])
+                            if order_rels:
+                                ship_by_date = order_rels[0].get("NeedByDate", "") or order_rels[0].get("ReqDate", "")
+                    except Exception as e:
+                        print(f"Error getting ship date for job {job_num}: {e}")
 
             return {
                 "jobNum": job_num,
