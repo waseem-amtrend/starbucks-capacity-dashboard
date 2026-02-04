@@ -954,9 +954,16 @@ def get_transactions():
         response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=60)
 
         if response.status_code != 200:
+            error_detail = ""
+            try:
+                error_detail = response.text[:500]
+            except:
+                pass
+            print(f"Epicor transactions API error: {response.status_code} - {error_detail}")
             return jsonify({
                 "success": False,
                 "error": f"Epicor API error: {response.status_code}",
+                "detail": error_detail,
                 "timestamp": datetime.now().isoformat()
             })
 
