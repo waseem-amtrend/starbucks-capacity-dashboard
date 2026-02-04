@@ -29,93 +29,163 @@ EPICOR_CONFIG = {
     "company": "28648"  # Company ID for authentication
 }
 
-# Master BOM from Quote 109209
-MASTER_BOM = {
-    "SBX-22721": {
-        "description": "Moon Chair, Fern Green F0244",
-        "starbucksPartNum": "11174933",
-        "quoteLine": "109209-5",
-        "components": {
-            "SBX-118": {"qty": 1.0, "uom": "EA", "type": "Frame"},
-            "LEA-SBX14": {"qty": 55.0, "uom": "SQFT", "type": "Leather"},
-            "FOAM-171": {"qty": 1.0, "uom": "EA", "type": "Pattern"},
-            "FOAM-136": {"qty": 0.75, "uom": "EA", "type": "Foam"},
-            "FOAM-130": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-125": {"qty": 0.33, "uom": "EA", "type": "Foam"},
-            "FOAM-132": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "POLB-129": {"qty": 1.0, "uom": "RL", "type": "Packaging"},
-            "CTNS-117": {"qty": 1.0, "uom": "EA", "type": "Packaging"}
-        }
-    },
-    "SBX-24540": {
-        "description": "Comf Chair, Fern Green F0244",
-        "starbucksPartNum": "11174936",
-        "quoteLine": "109209-1",
-        "components": {
-            "SBX-119": {"qty": 1.0, "uom": "EA", "type": "Frame"},
-            "LEA-SBX14": {"qty": 90.0, "uom": "SQFT", "type": "Leather"},
-            "FOAM-170": {"qty": 1.0, "uom": "EA", "type": "Pattern"},
-            "FOAM-130": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-132": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-125": {"qty": 0.33, "uom": "EA", "type": "Foam"},
-            "POLB-129": {"qty": 1.0, "uom": "RL", "type": "Packaging"},
-            "CTNS-118": {"qty": 1.0, "uom": "EA", "type": "Packaging"}
-        }
-    },
-    "SBX-24541": {
-        "description": "Comf Chair, Roast Natural F0262",
-        "starbucksPartNum": "11174939",
-        "quoteLine": "109209-2",
-        "components": {
-            "SBX-119": {"qty": 1.0, "uom": "EA", "type": "Frame"},
-            "LEA-SBX16": {"qty": 90.0, "uom": "SQFT", "type": "Leather"},
-            "FOAM-170": {"qty": 1.0, "uom": "EA", "type": "Pattern"},
-            "FOAM-130": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-136": {"qty": 1.04, "uom": "EA", "type": "Foam"},
-            "FOAM-132": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-125": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "POLB-129": {"qty": 1.0, "uom": "RL", "type": "Packaging"},
-            "CTNS-118": {"qty": 1.0, "uom": "EA", "type": "Packaging"}
-        }
-    },
-    "SBX-24545": {
-        "description": "Moon Chair, Roast Natural F0262",
-        "starbucksPartNum": "11174935",
-        "quoteLine": "109209-4",
-        "components": {
-            "SBX-118": {"qty": 1.0, "uom": "EA", "type": "Frame"},
-            "LEA-SBX16": {"qty": 55.0, "uom": "SQFT", "type": "Leather"},
-            "FOAM-171": {"qty": 1.0, "uom": "EA", "type": "Pattern"},
-            "FOAM-136": {"qty": 1.0, "uom": "EA", "type": "Foam"},
-            "FOAM-130": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-125": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-132": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "POLB-129": {"qty": 1.0, "uom": "RL", "type": "Packaging"},
-            "CTNS-117": {"qty": 1.0, "uom": "EA", "type": "Packaging"}
-        }
-    },
-    "SBX-22880": {
-        "description": "Comf Chair, Tan Brown F0245",
-        "starbucksPartNum": "11174937",
-        "quoteLine": "109209-3",
-        "components": {
-            "SBX-119": {"qty": 1.0, "uom": "EA", "type": "Frame"},
-            "LEA-SBX15": {"qty": 90.0, "uom": "SQFT", "type": "Leather"},
-            "FOAM-170": {"qty": 1.0, "uom": "EA", "type": "Pattern"},
-            "FOAM-130": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-132": {"qty": 0.5, "uom": "EA", "type": "Foam"},
-            "FOAM-125": {"qty": 0.33, "uom": "EA", "type": "Foam"},
-            "POLB-129": {"qty": 1.0, "uom": "RL", "type": "Packaging"},
-            "CTNS-118": {"qty": 1.0, "uom": "EA", "type": "Packaging"}
-        }
+# Master Quote Number for dynamic BOM fetching
+MASTER_QUOTE_NUM = 109209
+
+# Starbucks SKU mapping (Part Number -> Starbucks SKU)
+STARBUCKS_SKU_MAP = {
+    "SBX-22721": "11174933",  # Moon Chair, Fern Green
+    "SBX-24545": "11174935",  # Moon Chair, Roast Natural
+    "SBX-24540": "11174936",  # Comf Chair, Fern Green
+    "SBX-22880": "11174937",  # Comf Chair, Tan Brown
+    "SBX-24541": "11174939",  # Comf Chair, Roast Natural
+}
+
+# Component type classification (for UI display)
+COMPONENT_TYPES = {
+    "SBX-118": "Frame",
+    "SBX-119": "Frame",
+    "LEA-SBX14": "Leather",
+    "LEA-SBX15": "Leather",
+    "LEA-SBX16": "Leather",
+    "FOAM-170": "Pattern",
+    "FOAM-171": "Pattern",
+    "FOAM-125": "Foam",
+    "FOAM-130": "Foam",
+    "FOAM-132": "Foam",
+    "FOAM-136": "Foam",
+    "POLB-129": "Packaging",
+    "CTNS-117": "Packaging",
+    "CTNS-118": "Packaging",
+}
+
+# UOM Conversions - parts where inventory UOM differs from consumption UOM
+# Key: PartNum, Value: {inventoryUom, consumptionUom, conversionFactor, consumptionQtyPerUnit}
+#
+# POLB-129: Polybag 60" x 50CF - tracked in rolls (RL), but consumed as EA (1 bag per chair)
+# - Inventory UOM: RL (Roll) - purchased and stocked in rolls
+# - Roll contains: 100 bags (EA)
+# - Consumption: 1 bag (EA) per chair
+# - The BOM shows 1 RL per chair, but actually each chair only uses 1 bag from the roll
+# - This is a BOM data issue - the BOM should say 0.01 RL or 1 EA per chair
+# - We override the BOM qty per to 1 EA (1 bag per chair)
+UOM_CONVERSIONS = {
+    "POLB-129": {
+        "inventoryUom": "RL",
+        "consumptionUom": "EA",
+        "conversionFactor": 100,  # 1 RL = 100 EA
+        "overrideBomQtyPer": 1.0  # Each chair consumes 1 EA (bag), not 1 RL
     }
 }
+
+# Cache for BOM data (refreshed on demand or periodically)
+BOM_CACHE = {}
+BOM_CACHE_TIME = None
+BOM_CACHE_EXPIRY = timedelta(minutes=30)  # Refresh BOM every 30 minutes
+
+
+def fetch_quote_bom_from_epicor():
+    """Fetch BOM dynamically from Epicor Quote 109209.
+    Returns dict of SKU -> {description, starbucksPartNum, quoteLine, components}
+    """
+    global BOM_CACHE, BOM_CACHE_TIME
+
+    # Return cached BOM if still valid
+    if BOM_CACHE_TIME and (datetime.now() - BOM_CACHE_TIME) < BOM_CACHE_EXPIRY and BOM_CACHE:
+        print("Using cached BOM data")
+        return BOM_CACHE
+
+    print(f"Fetching fresh BOM from Epicor Quote {MASTER_QUOTE_NUM}...")
+    bom_data = {}
+
+    try:
+        # First get the quote lines to get parent part info
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.QuoteAsmSvc/QuoteAsms"
+        params = {
+            "$filter": f"QuoteNum eq {MASTER_QUOTE_NUM}",
+            "$select": "QuoteNum,QuoteLine,AssemblySeq,PartNum,Description"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+
+        if response.status_code != 200:
+            print(f"Failed to fetch quote assemblies: {response.status_code}")
+            return BOM_CACHE if BOM_CACHE else {}
+
+        assemblies = response.json().get("value", [])
+
+        # For each assembly (quote line), get the materials
+        for asm in assemblies:
+            quote_line = asm.get("QuoteLine")
+            part_num = asm.get("PartNum", "")
+            description = asm.get("Description", "")
+
+            # Only process SBX parts (our finished goods)
+            if not part_num.startswith("SBX-"):
+                continue
+
+            # Fetch materials for this quote line using GetByID
+            mtl_url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.QuoteAsmSvc/GetByID"
+            mtl_params = {
+                "quoteNum": MASTER_QUOTE_NUM,
+                "quoteLine": quote_line,
+                "assemblySeq": 0
+            }
+            mtl_response = requests.get(mtl_url, headers=get_epicor_headers(), params=mtl_params, timeout=30)
+
+            if mtl_response.status_code != 200:
+                print(f"Failed to fetch materials for line {quote_line}: {mtl_response.status_code}")
+                continue
+
+            mtl_data = mtl_response.json()
+            materials = mtl_data.get("returnObj", {}).get("QuoteMtl", [])
+
+            # Build components dict
+            components = {}
+            for mtl in materials:
+                mtl_part = mtl.get("PartNum", "")
+                qty_per = float(mtl.get("QtyPer", 0) or 0)
+                uom = mtl.get("IUM", "EA")
+
+                # Get component type from classification
+                comp_type = COMPONENT_TYPES.get(mtl_part, "Other")
+
+                components[mtl_part] = {
+                    "qty": qty_per,
+                    "uom": uom,
+                    "type": comp_type,
+                    "mtlSeq": mtl.get("MtlSeq", 0)
+                }
+
+            # Add to BOM data
+            bom_data[part_num] = {
+                "description": description,
+                "starbucksPartNum": STARBUCKS_SKU_MAP.get(part_num, ""),
+                "quoteLine": f"{MASTER_QUOTE_NUM}-{quote_line}",
+                "components": components
+            }
+
+        # Update cache
+        BOM_CACHE = bom_data
+        BOM_CACHE_TIME = datetime.now()
+        print(f"BOM cache updated with {len(bom_data)} SKUs")
+
+        return bom_data
+
+    except Exception as e:
+        print(f"Error fetching BOM from Epicor: {e}")
+        return BOM_CACHE if BOM_CACHE else {}
+
+
+def get_master_bom():
+    """Get the master BOM - fetches from Epicor dynamically"""
+    return fetch_quote_bom_from_epicor()
 
 
 def get_all_components():
     """Extract all unique component part numbers from BOM"""
+    bom = get_master_bom()
     components = set()
-    for sku_data in MASTER_BOM.values():
+    for sku_data in bom.values():
         components.update(sku_data["components"].keys())
     return list(components)
 
@@ -478,6 +548,19 @@ def query_epicor_job_demands(part_num):
     return {"totalDemand": 0, "jobCount": 0, "jobs": []}
 
 
+def apply_uom_conversion(part_num, qty, from_uom):
+    """Apply UOM conversion for parts that have different inventory vs consumption UOMs.
+    Returns tuple of (converted_qty, converted_uom, conversion_applied)
+    """
+    if part_num in UOM_CONVERSIONS:
+        conv = UOM_CONVERSIONS[part_num]
+        if from_uom == conv["inventoryUom"]:
+            # Convert from inventory UOM to consumption UOM
+            converted_qty = qty * conv["conversionFactor"]
+            return (converted_qty, conv["consumptionUom"], True)
+    return (qty, from_uom, False)
+
+
 def fetch_part_inventory(part_num):
     """Fetch inventory, part info, and job demands for a single part - used for parallel execution"""
     whse_result = query_epicor_partwhse(part_num)
@@ -508,16 +591,30 @@ def fetch_part_inventory(part_num):
         available = total_on_hand - total_allocated
         true_available = max(0, available - job_demand)
 
+        # Apply UOM conversion if needed (e.g., POLB-129: 1 RL = 100 EA)
+        # NOTE: Inventory is in stocking UOM (RL), but job demands are already in consumption UOM (EA)
+        # So we only convert inventory quantities, NOT job demands
+        inventory_uom = uom
+        converted_on_hand, display_uom, conversion_applied = apply_uom_conversion(part_num, total_on_hand, uom)
+        converted_allocated, _, _ = apply_uom_conversion(part_num, total_allocated, uom)
+        # Job demands are already in consumption UOM (EA) from Epicor, don't convert
+        converted_job_demand = job_demand
+        # Recalculate available and true available after conversion
+        converted_available = converted_on_hand - converted_allocated
+        converted_true_available = max(0, converted_available - converted_job_demand)
+
         return {
             "partNum": part_num,
             "description": description,
-            "onHand": total_on_hand,
-            "allocated": total_allocated,
-            "jobDemand": job_demand,
+            "onHand": converted_on_hand,
+            "allocated": converted_allocated,
+            "jobDemand": converted_job_demand,
             "jobCount": job_count,
-            "available": available,
-            "trueAvailable": true_available,
-            "uom": uom,
+            "available": converted_available,
+            "trueAvailable": converted_true_available,
+            "uom": display_uom,  # Display in consumption UOM (EA for POLB-129)
+            "inventoryUom": inventory_uom,  # Original inventory UOM
+            "conversionApplied": conversion_applied,
             "warehouses": [
                 {
                     "warehouseCode": r.get("WarehouseCode", ""),
@@ -539,6 +636,8 @@ def fetch_part_inventory(part_num):
             "available": 0,
             "trueAvailable": 0,
             "uom": uom,
+            "inventoryUom": uom,
+            "conversionApplied": False,
             "warehouses": [],
             "error": "Failed to fetch inventory from Epicor"
         }
@@ -663,17 +762,29 @@ def get_open_pos():
 
 @app.route('/api/bom', methods=['GET'])
 def get_bom():
-    """Return master BOM structure"""
+    """Return master BOM structure - fetched dynamically from Epicor"""
+    force_refresh = request.args.get('refresh', 'false').lower() == 'true'
+
+    if force_refresh:
+        global BOM_CACHE_TIME
+        BOM_CACHE_TIME = None  # Force cache invalidation
+
+    bom = get_master_bom()
     return jsonify({
         "success": True,
-        "data": MASTER_BOM,
-        "timestamp": datetime.now().isoformat()
+        "data": bom,
+        "timestamp": datetime.now().isoformat(),
+        "source": f"Epicor Quote {MASTER_QUOTE_NUM}",
+        "cacheTime": BOM_CACHE_TIME.isoformat() if BOM_CACHE_TIME else None
     })
 
 
 @app.route('/api/capacity', methods=['GET'])
 def calculate_capacity():
     """Calculate production capacity using live Epicor data"""
+    # Get the dynamic BOM from Epicor
+    master_bom = get_master_bom()
+
     # Fetch live inventory
     inv_response = get_inventory()
     inv_data = inv_response.get_json()
@@ -689,7 +800,7 @@ def calculate_capacity():
     total_future = 0
     blocked_count = 0
 
-    for sku, sku_data in MASTER_BOM.items():
+    for sku, sku_data in master_bom.items():
         bottlenecks = []
 
         for component, details in sku_data["components"].items():
@@ -704,12 +815,40 @@ def calculate_capacity():
             job_demand = inv.get("jobDemand", 0)
             job_count = inv.get("jobCount", 0)
 
+            # Apply UOM conversion to incoming PO quantities if needed
+            # POs may be in inventory UOM (RL) but we need consumption UOM (EA)
+            if component in UOM_CONVERSIONS:
+                conv = UOM_CONVERSIONS[component]
+                # Convert incoming PO qty from inventory UOM to consumption UOM
+                incoming_qty = incoming_qty * conv["conversionFactor"]
+
             # Future available is based on true available + incoming POs
             future_available = true_available + incoming_qty
 
-            # Calculate capacity using TRUE available (after job demands)
-            max_units_now = int(true_available / details["qty"]) if details["qty"] > 0 else 0
-            max_units_future = int(future_available / details["qty"]) if details["qty"] > 0 else 0
+            # Get BOM qty per unit - this is in the BOM UOM (e.g., 1 RL for POLB-129)
+            bom_qty_per = details["qty"]
+            bom_uom = details["uom"]
+
+            # For capacity calculation, we need to handle UOM conversions
+            # Example: POLB-129 BOM says 1 RL per chair, but actually each chair uses 1 bag (EA)
+            # The BOM is incorrect - it should say 0.01 RL or 1 EA per chair
+            # We override with the correct consumption qty per unit
+            effective_qty_per = bom_qty_per
+            display_uom = bom_uom
+            if component in UOM_CONVERSIONS:
+                conv = UOM_CONVERSIONS[component]
+                # If there's an override for BOM qty per, use it
+                if "overrideBomQtyPer" in conv:
+                    effective_qty_per = conv["overrideBomQtyPer"]
+                    display_uom = conv["consumptionUom"]
+                elif bom_uom == conv["inventoryUom"]:
+                    # Convert BOM qty from inventory UOM to consumption UOM
+                    effective_qty_per = bom_qty_per * conv["conversionFactor"]
+                    display_uom = conv["consumptionUom"]
+
+            # Calculate capacity using TRUE available (after job demands) and effective qty per
+            max_units_now = int(true_available / effective_qty_per) if effective_qty_per > 0 else 0
+            max_units_future = int(future_available / effective_qty_per) if effective_qty_per > 0 else 0
 
             # Determine status based on true available
             if true_available <= 0:
@@ -722,7 +861,9 @@ def calculate_capacity():
             bottlenecks.append({
                 "component": component,
                 "description": inv.get("description", ""),
-                "qtyPer": details["qty"],
+                "qtyPer": effective_qty_per,  # Qty per in consumption UOM
+                "bomQtyPer": bom_qty_per,  # Original BOM qty per
+                "bomUom": bom_uom,  # Original BOM UOM
                 "available": available,  # Raw available (before job demands)
                 "trueAvailable": true_available,  # After job demands
                 "jobDemand": job_demand,  # Qty committed to open jobs
@@ -733,9 +874,10 @@ def calculate_capacity():
                 "futureAvailable": future_available,
                 "maxUnitsNow": max_units_now,
                 "maxUnitsFuture": max_units_future,
-                "uom": details["uom"],
+                "uom": display_uom,  # Display in consumption UOM
                 "type": details["type"],
-                "status": status
+                "status": status,
+                "conversionApplied": component in UOM_CONVERSIONS
             })
 
         # Find limiting components
@@ -767,16 +909,20 @@ def calculate_capacity():
             "totalCurrentCapacity": total_current,
             "totalFutureCapacity": total_future,
             "blockedSkus": blocked_count,
-            "totalSkus": len(MASTER_BOM)
+            "totalSkus": len(master_bom)
         },
         "timestamp": datetime.now().isoformat(),
-        "source": "Epicor REST API - Live Data"
+        "source": f"Epicor REST API - Live Data (Quote {MASTER_QUOTE_NUM})"
     })
 
 
 @app.route('/api/refresh', methods=['POST'])
 def refresh_all_data():
-    """Force refresh all data from Epicor"""
+    """Force refresh all data from Epicor including BOM"""
+    global BOM_CACHE_TIME, JOB_DEMANDS_CACHE_TIME
+    # Invalidate caches to force fresh data
+    BOM_CACHE_TIME = None
+    JOB_DEMANDS_CACHE_TIME = None
     return calculate_capacity()
 
 
@@ -815,45 +961,40 @@ def health_check():
     })
 
 
-def preload_part_cache():
-    """Preload part descriptions into cache for faster responses"""
-    components = get_all_components()
-    print(f"Preloading part info cache for {len(components)} components...")
-
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(query_epicor_part, part): part for part in components}
-        for future in as_completed(futures):
-            part = futures[future]
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Error preloading {part}: {e}")
-
-    print(f"Part cache preloaded with {len(PART_INFO_CACHE)} parts")
-
-
-def preload_job_demands_background():
-    """Preload job demands in background thread to avoid first-request delay"""
+def preload_all_caches_background():
+    """Preload all caches in background thread - doesn't block server startup"""
     import threading
     import time
 
-    def load_demands():
-        time.sleep(2)  # Wait for server to be ready
+    def load_all():
+        time.sleep(5)  # Wait for server to be fully ready and pass health checks
         try:
-            print("Background: Preloading job demands...")
+            # Preload part cache first
             components = get_all_components()
+            print(f"Background: Preloading part info cache for {len(components)} components...")
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {executor.submit(query_epicor_part, part): part for part in components}
+                for future in as_completed(futures):
+                    part = futures[future]
+                    try:
+                        future.result()
+                    except Exception as e:
+                        print(f"Error preloading {part}: {e}")
+            print(f"Background: Part cache preloaded with {len(PART_INFO_CACHE)} parts")
+
+            # Then preload job demands
+            print("Background: Preloading job demands...")
             query_all_job_demands(components)
             print("Background: Job demands preloaded successfully")
         except Exception as e:
-            print(f"Background: Error preloading job demands: {e}")
+            print(f"Background: Error preloading caches: {e}")
 
-    thread = threading.Thread(target=load_demands, daemon=True)
+    thread = threading.Thread(target=load_all, daemon=True)
     thread.start()
 
 
-# Preload cache on startup (for gunicorn workers)
-preload_part_cache()
-preload_job_demands_background()
+# Start background preload (non-blocking - server starts immediately)
+preload_all_caches_background()
 
 
 if __name__ == '__main__':
