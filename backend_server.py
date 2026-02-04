@@ -939,9 +939,9 @@ def get_transactions():
             part_filter = " or ".join([f"PartNum eq '{p}'" for p in components])
             filters.append(f"({part_filter})")
 
-        # Date filter - last N days (use OData datetime format with Z suffix)
-        from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%dT00:00:00Z')
-        filters.append(f"TranDate ge {from_date}")
+        # Date filter - last N days (use OData datetime literal format)
+        from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        filters.append(f"TranDate ge datetime'{from_date}T00:00:00'")
 
         url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartTranSvc/PartTrans"
         params = {
