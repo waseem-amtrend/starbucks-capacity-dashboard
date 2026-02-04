@@ -916,6 +916,226 @@ def calculate_capacity():
     })
 
 
+@app.route('/api/transactions', methods=['GET'])
+def get_transactions():
+    """Get material transaction history for Starbucks BOM parts.
+    Query params:
+        part_num: Filter by specific part (optional)
+        days_back: Number of days of history (default 30)
+    """
+    part_num = request.args.get('part_num')
+    days_back = int(request.args.get('days_back', 30))
+
+    try:
+        # Build filter for transaction query
+        filters = []
+
+        if part_num:
+            # Single part filter
+            filters.append(f"PartNum eq '{part_num}'")
+        else:
+            # Filter by all BOM component parts
+            components = get_all_components()
+            part_filter = " or ".join([f"PartNum eq '{p}'" for p in components])
+            filters.append(f"({part_filter})")
+
+        # Date filter - last N days
+        from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        filters.append(f"TranDate ge {from_date}")
+
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.PartTranSvc/PartTrans"
+        params = {
+            "$filter": " and ".join(filters),
+            "$select": "TranDate,TranType,TranQty,JobNum,PartNum,WareHouseCode,EntryPerson,TranReference,PartDescription",
+            "$orderby": "TranDate desc,SysTime desc",
+            "$top": "500"
+        }
+
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=60)
+
+        if response.status_code != 200:
+            return jsonify({
+                "success": False,
+                "error": f"Epicor API error: {response.status_code}",
+                "timestamp": datetime.now().isoformat()
+            })
+
+        data = response.json()
+        transactions = []
+
+        for record in data.get("value", []):
+            tran_type = record.get("TranType", "")
+            # Classify transaction type for UI display
+            if tran_type in ["STK-MTL", "MTL-STK"]:
+                type_label = "Issue to Job" if tran_type == "STK-MTL" else "Return from Job"
+                type_class = "issue"
+            elif tran_type in ["PUR-STK", "REC-STK"]:
+                type_label = "Receipt"
+                type_class = "receipt"
+            elif tran_type in ["ADJ-QTY", "ADJ-CST"]:
+                type_label = "Adjustment"
+                type_class = "adjustment"
+            else:
+                type_label = tran_type
+                type_class = "other"
+
+            transactions.append({
+                "date": record.get("TranDate", ""),
+                "type": tran_type,
+                "typeLabel": type_label,
+                "typeClass": type_class,
+                "qty": float(record.get("TranQty", 0) or 0),
+                "jobNum": record.get("JobNum", ""),
+                "partNum": record.get("PartNum", ""),
+                "partDescription": record.get("PartDescription", ""),
+                "warehouse": record.get("WareHouseCode", ""),
+                "entryPerson": record.get("EntryPerson", ""),
+                "reference": record.get("TranReference", "")
+            })
+
+        return jsonify({
+            "success": True,
+            "data": transactions,
+            "count": len(transactions),
+            "filter": {
+                "partNum": part_num,
+                "daysBack": days_back
+            },
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        print(f"Error fetching transactions: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
+
+@app.route('/api/job-materials', methods=['GET'])
+def get_job_materials():
+    """Get all open Starbucks SBX jobs with their material status.
+    Shows which materials have been issued vs required for each job.
+    """
+    try:
+        # Get open Starbucks jobs
+        starbucks_jobs = get_starbucks_open_jobs()
+        if not starbucks_jobs:
+            return jsonify({
+                "success": True,
+                "data": [],
+                "count": 0,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        # Get job details to filter only SBX finished goods
+        sbx_finished_goods = {'SBX-22721', 'SBX-22880', 'SBX-24540', 'SBX-24541', 'SBX-24545'}
+
+        url = f"{EPICOR_CONFIG['base_url']}/Erp.BO.JobEntrySvc/JobEntries"
+        params = {
+            "$filter": "JobComplete eq false and JobClosed eq false",
+            "$select": "JobNum,PartNum,PartDescription,ProdQty,StartDate,ReqDueDate",
+            "$orderby": "JobNum desc",
+            "$top": "500"
+        }
+        response = requests.get(url, headers=get_epicor_headers(), params=params, timeout=30)
+
+        job_info = {}
+        if response.status_code == 200:
+            for job in response.json().get("value", []):
+                job_info[job.get("JobNum", "")] = job
+
+        # Filter to SBX jobs only
+        sbx_jobs = [j for j in starbucks_jobs if job_info.get(j, {}).get("PartNum", "") in sbx_finished_goods]
+
+        # Get materials for each job (limit to most recent 50 to avoid timeout)
+        recent_jobs = sorted(sbx_jobs, reverse=True)[:50]
+
+        job_cards = []
+
+        def process_job_for_card(job_num):
+            """Get job materials and build card data"""
+            materials = get_job_materials_via_getbyid(job_num)
+            info = job_info.get(job_num, {})
+
+            material_rows = []
+            total_required = 0
+            total_issued = 0
+
+            for mtl in materials:
+                required = float(mtl.get("RequiredQty", 0) or 0)
+                issued = float(mtl.get("IssuedQty", 0) or 0)
+                total_required += required
+                total_issued += issued
+
+                # Determine status
+                if issued >= required and required > 0:
+                    status = "complete"
+                elif issued > 0:
+                    status = "partial"
+                else:
+                    status = "missing"
+
+                material_rows.append({
+                    "partNum": mtl.get("PartNum", ""),
+                    "required": required,
+                    "issued": issued,
+                    "remaining": max(0, required - issued),
+                    "status": status,
+                    "uom": mtl.get("IUM", "EA")
+                })
+
+            # Overall job status
+            if total_issued >= total_required and total_required > 0:
+                job_status = "complete"
+            elif total_issued > 0:
+                job_status = "partial"
+            else:
+                job_status = "missing"
+
+            return {
+                "jobNum": job_num,
+                "partNum": info.get("PartNum", ""),
+                "partDescription": info.get("PartDescription", ""),
+                "prodQty": float(info.get("ProdQty", 0) or 0),
+                "startDate": info.get("StartDate", ""),
+                "dueDate": info.get("ReqDueDate", ""),
+                "materials": material_rows,
+                "materialCount": len(material_rows),
+                "status": job_status
+            }
+
+        # Process jobs in parallel for speed
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(process_job_for_card, job): job for job in recent_jobs}
+            for future in as_completed(futures):
+                try:
+                    card = future.result()
+                    if card["materials"]:  # Only include jobs with materials
+                        job_cards.append(card)
+                except Exception as e:
+                    print(f"Error processing job: {e}")
+
+        # Sort by job number descending
+        job_cards.sort(key=lambda x: x["jobNum"], reverse=True)
+
+        return jsonify({
+            "success": True,
+            "data": job_cards,
+            "count": len(job_cards),
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        print(f"Error fetching job materials: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
+
 @app.route('/api/refresh', methods=['POST'])
 def refresh_all_data():
     """Force refresh all data from Epicor including BOM"""

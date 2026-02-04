@@ -590,6 +590,292 @@
             color: var(--amtrend-blue);
             text-decoration: none;
         }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            padding: 0 40px;
+            background: white;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            padding: 14px 24px;
+            border: none;
+            background: transparent;
+            color: #666;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn:hover {
+            color: #00704a;
+            background: #f8f8f8;
+        }
+
+        .tab-btn.active {
+            color: #00704a;
+            border-bottom-color: #00704a;
+            background: transparent;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Transaction History Styles */
+        .filter-bar {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 16px 20px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .filter-bar select,
+        .filter-bar input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        .filter-bar select:focus,
+        .filter-bar input:focus {
+            outline: none;
+            border-color: #00704a;
+        }
+
+        .transaction-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .transaction-table th {
+            background: #f5f5f5;
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .transaction-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        .transaction-table tr:hover {
+            background: #fafafa;
+        }
+
+        .tran-type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .tran-type-badge.issue {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .tran-type-badge.receipt {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .tran-type-badge.adjustment {
+            background: #fff8e1;
+            color: #f57f17;
+        }
+
+        .tran-type-badge.other {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        /* Job Cards Grid */
+        .job-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .job-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+
+        .job-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+
+        .job-card-header {
+            background: linear-gradient(135deg, #1e3932 0%, #2a5244 100%);
+            color: white;
+            padding: 16px 20px;
+        }
+
+        .job-card-header .job-num {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .job-card-header .job-part {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .job-card-header .job-qty {
+            float: right;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .job-card-body {
+            padding: 16px 20px;
+        }
+
+        .material-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .material-row:last-child {
+            border-bottom: none;
+        }
+
+        .material-info {
+            flex: 1;
+        }
+
+        .material-info .part-num {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1e3932;
+        }
+
+        .material-info .qty-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .material-status {
+            font-weight: 700;
+            font-size: 18px;
+            width: 30px;
+            text-align: center;
+        }
+
+        .material-status.complete {
+            color: #28a745;
+        }
+
+        .material-status.partial {
+            color: #ffc107;
+        }
+
+        .material-status.missing {
+            color: #dc3545;
+        }
+
+        .job-card-footer {
+            padding: 12px 20px;
+            background: #f8f8f8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .job-status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .job-status-badge.complete {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .job-status-badge.partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .job-status-badge.missing {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 40px;
+            color: #888;
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        .tracking-loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -633,6 +919,18 @@
         <div class="timestamp" id="timestamp">Last updated: --</div>
     </div>
 
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="capacity" onclick="switchTab('capacity')">
+            &#128202; Capacity Dashboard
+        </button>
+        <button class="tab-btn" data-tab="tracking" onclick="switchTab('tracking')">
+            &#128203; Material Tracking
+        </button>
+    </div>
+
+    <!-- Tab Content: Capacity Dashboard -->
+    <div class="tab-content active" id="capacity-tab">
     <div class="container">
         <div class="error-message" id="errorMessage"></div>
 
@@ -683,6 +981,66 @@
             <h2 class="section-title">Production Capacity by SKU</h2>
             <div class="sku-grid" id="skuGrid">
                 <!-- SKU cards populated by JS -->
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Tab Content: Material Tracking -->
+    <div class="tab-content" id="tracking-tab">
+        <div class="container">
+            <!-- Section 1: Transaction History -->
+            <div class="section">
+                <h2 class="section-title">Material Transaction History</h2>
+                <div class="filter-bar">
+                    <label for="partFilter">Part:</label>
+                    <select id="partFilter" onchange="filterTransactions()">
+                        <option value="">All BOM Parts</option>
+                    </select>
+                    <label for="daysFilter">Days Back:</label>
+                    <select id="daysFilter" onchange="filterTransactions()">
+                        <option value="7">7 Days</option>
+                        <option value="14">14 Days</option>
+                        <option value="30" selected>30 Days</option>
+                        <option value="60">60 Days</option>
+                        <option value="90">90 Days</option>
+                    </select>
+                    <button class="btn" onclick="loadTransactions()" style="margin-left: auto;">
+                        &#8635; Refresh Transactions
+                    </button>
+                </div>
+                <div id="transactionTableContainer">
+                    <table class="transaction-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Part Number</th>
+                                <th>Quantity</th>
+                                <th>Job #</th>
+                                <th>Warehouse</th>
+                                <th>User</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionBody">
+                            <tr><td colspan="7" class="tracking-loading">Loading transactions...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Section 2: Job Material Cards -->
+            <div class="section">
+                <h2 class="section-title">Open Job Material Status</h2>
+                <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+                    Shows BOM components for open Starbucks jobs and whether materials have been issued.
+                    <span style="color: #28a745;">&#10004;</span> = Fully issued &nbsp;
+                    <span style="color: #ffc107;">&#9888;</span> = Partially issued &nbsp;
+                    <span style="color: #dc3545;">&#10008;</span> = Not issued
+                </p>
+                <div id="jobCardsContainer" class="job-cards-grid">
+                    <div class="tracking-loading" style="grid-column: 1 / -1;">Loading job materials...</div>
+                </div>
             </div>
         </div>
     </div>
@@ -1037,6 +1395,266 @@
             } finally {
                 setLoading(false);
             }
+        }
+
+        // ============================================
+        // TAB SWITCHING & MATERIAL TRACKING FUNCTIONS
+        // ============================================
+
+        let trackingDataLoaded = false;
+        let transactionsData = [];
+        let jobMaterialsData = [];
+
+        // Switch between tabs
+        function switchTab(tabId) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+
+            // Load tracking data on first visit
+            if (tabId === 'tracking' && !trackingDataLoaded) {
+                loadTrackingData();
+            }
+        }
+
+        // Load all tracking data
+        async function loadTrackingData() {
+            await Promise.all([
+                loadTransactions(),
+                loadJobMaterials()
+            ]);
+            trackingDataLoaded = true;
+        }
+
+        // Fetch and render transactions
+        async function loadTransactions() {
+            const partFilter = document.getElementById('partFilter').value;
+            const daysFilter = document.getElementById('daysFilter').value;
+
+            const tbody = document.getElementById('transactionBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="tracking-loading">Loading transactions...</td></tr>';
+
+            try {
+                let url = `${API_BASE}/api/transactions?days_back=${daysFilter}`;
+                if (partFilter) {
+                    url += `&part_num=${encodeURIComponent(partFilter)}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    transactionsData = result.transactions;
+                    renderTransactionTable(transactionsData);
+
+                    // Populate part filter dropdown if empty
+                    const partDropdown = document.getElementById('partFilter');
+                    if (partDropdown.options.length <= 1 && result.bomParts) {
+                        result.bomParts.forEach(part => {
+                            const option = document.createElement('option');
+                            option.value = part;
+                            option.textContent = part;
+                            partDropdown.appendChild(option);
+                        });
+                    }
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="7" class="tracking-loading" style="color: #dc3545;">Error: ${result.error}</td></tr>`;
+                }
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="7" class="tracking-loading" style="color: #dc3545;">Failed to load transactions: ${error.message}</td></tr>`;
+            }
+        }
+
+        // Render transaction table
+        function renderTransactionTable(transactions) {
+            const tbody = document.getElementById('transactionBody');
+
+            if (!transactions || transactions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <div class="icon">&#128203;</div>
+                                <h3>No Transactions Found</h3>
+                                <p>No material transactions found for the selected filters.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = transactions.map(t => {
+                // Determine transaction type badge
+                let typeClass = 'other';
+                let typeLabel = t.tranType || 'Unknown';
+
+                if (t.tranType === 'STK-MTL' || t.tranType === 'MFG-STK') {
+                    typeClass = 'issue';
+                    typeLabel = 'Issue to Job';
+                } else if (t.tranType === 'PUR-STK' || t.tranType === 'REC-ADJ') {
+                    typeClass = 'receipt';
+                    typeLabel = 'Receipt';
+                } else if (t.tranType === 'ADJ-QTY' || t.tranType === 'INV-ADJ') {
+                    typeClass = 'adjustment';
+                    typeLabel = 'Adjustment';
+                }
+
+                // Format quantity with sign
+                const qty = t.tranQty || 0;
+                const qtyDisplay = qty >= 0 ? `+${formatNumber(qty)}` : formatNumber(qty);
+                const qtyColor = qty >= 0 ? '#28a745' : '#dc3545';
+
+                return `
+                    <tr>
+                        <td>${formatTransactionDate(t.tranDate)}</td>
+                        <td><span class="tran-type-badge ${typeClass}">${typeLabel}</span></td>
+                        <td><strong>${t.partNum || '-'}</strong></td>
+                        <td style="color: ${qtyColor}; font-weight: 600;">${qtyDisplay}</td>
+                        <td>${t.jobNum || '-'}</td>
+                        <td>${t.wareHouseCode || '-'}</td>
+                        <td>${t.entryPerson || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Format transaction date
+        function formatTransactionDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+            } catch {
+                return dateStr;
+            }
+        }
+
+        // Filter transactions (alias for reload)
+        function filterTransactions() {
+            loadTransactions();
+        }
+
+        // Fetch and render job materials
+        async function loadJobMaterials() {
+            const container = document.getElementById('jobCardsContainer');
+            container.innerHTML = '<div class="tracking-loading" style="grid-column: 1 / -1;">Loading job materials...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/job-materials`);
+                const result = await response.json();
+
+                if (result.success) {
+                    jobMaterialsData = result.jobs;
+                    renderJobCards(jobMaterialsData);
+                } else {
+                    container.innerHTML = `<div class="tracking-loading" style="grid-column: 1 / -1; color: #dc3545;">Error: ${result.error}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="tracking-loading" style="grid-column: 1 / -1; color: #dc3545;">Failed to load job materials: ${error.message}</div>`;
+            }
+        }
+
+        // Render job cards
+        function renderJobCards(jobs) {
+            const container = document.getElementById('jobCardsContainer');
+
+            if (!jobs || jobs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="icon">&#128230;</div>
+                        <h3>No Open Jobs Found</h3>
+                        <p>No open Starbucks SBX jobs found in the system.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = jobs.map(job => {
+                // Calculate overall status
+                let completeCount = 0;
+                let partialCount = 0;
+                let missingCount = 0;
+
+                const materialsHtml = (job.materials || []).map(m => {
+                    const required = m.requiredQty || 0;
+                    const issued = m.issuedQty || 0;
+                    let statusIcon = '';
+                    let statusClass = '';
+
+                    if (required === 0) {
+                        statusIcon = '&#10004;';
+                        statusClass = 'complete';
+                        completeCount++;
+                    } else if (issued >= required) {
+                        statusIcon = '&#10004;';
+                        statusClass = 'complete';
+                        completeCount++;
+                    } else if (issued > 0) {
+                        statusIcon = '&#9888;';
+                        statusClass = 'partial';
+                        partialCount++;
+                    } else {
+                        statusIcon = '&#10008;';
+                        statusClass = 'missing';
+                        missingCount++;
+                    }
+
+                    return `
+                        <div class="material-row">
+                            <div class="material-info">
+                                <div class="part-num">${m.partNum || '-'}</div>
+                                <div class="qty-info">Required: ${formatNumber(required)} | Issued: ${formatNumber(issued)}</div>
+                            </div>
+                            <div class="material-status ${statusClass}">${statusIcon}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Determine overall job status
+                let jobStatusClass = 'complete';
+                let jobStatusLabel = 'All Issued';
+                if (missingCount > 0) {
+                    jobStatusClass = 'missing';
+                    jobStatusLabel = `${missingCount} Not Issued`;
+                } else if (partialCount > 0) {
+                    jobStatusClass = 'partial';
+                    jobStatusLabel = `${partialCount} Partial`;
+                }
+
+                const dueDate = job.dueDate ? formatDate(job.dueDate) : '-';
+
+                return `
+                    <div class="job-card">
+                        <div class="job-card-header">
+                            <span class="job-qty">Qty: ${formatNumber(job.prodQty || 0)}</span>
+                            <div class="job-num">${job.jobNum || '-'}</div>
+                            <div class="job-part">${job.partNum || '-'} - ${job.partDescription || ''}</div>
+                        </div>
+                        <div class="job-card-body">
+                            ${materialsHtml || '<div class="tracking-loading">No materials found</div>'}
+                        </div>
+                        <div class="job-card-footer">
+                            <span>Due: ${dueDate}</span>
+                            <span class="job-status-badge ${jobStatusClass}">${jobStatusLabel}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // Initialize on page load
