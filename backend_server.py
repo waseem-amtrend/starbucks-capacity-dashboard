@@ -1116,7 +1116,6 @@ def get_job_materials():
                 order_num = first_prod.get("OrderNum")
                 order_line = first_prod.get("OrderLine")
                 order_rel = first_prod.get("OrderRelNum", 1)
-                print(f"Job {job_num} - JobProd order link: OrderNum={order_num}, Line={order_line}, Rel={order_rel}")
 
                 if order_num and order_line:
                     try:
