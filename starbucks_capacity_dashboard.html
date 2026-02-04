@@ -1452,13 +1452,17 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    transactionsData = result.transactions;
+                    transactionsData = result.data || [];
                     renderTransactionTable(transactionsData);
 
-                    // Populate part filter dropdown if empty
+                    // Populate part filter dropdown if empty - fetch from capacity API
                     const partDropdown = document.getElementById('partFilter');
-                    if (partDropdown.options.length <= 1 && result.bomParts) {
-                        result.bomParts.forEach(part => {
+                    if (partDropdown.options.length <= 1 && capacityData) {
+                        const allParts = new Set();
+                        Object.values(capacityData).forEach(sku => {
+                            sku.bottlenecks.forEach(b => allParts.add(b.component));
+                        });
+                        Array.from(allParts).sort().forEach(part => {
                             const option = document.createElement('option');
                             option.value = part;
                             option.textContent = part;
@@ -1493,34 +1497,23 @@
             }
 
             tbody.innerHTML = transactions.map(t => {
-                // Determine transaction type badge
-                let typeClass = 'other';
-                let typeLabel = t.tranType || 'Unknown';
-
-                if (t.tranType === 'STK-MTL' || t.tranType === 'MFG-STK') {
-                    typeClass = 'issue';
-                    typeLabel = 'Issue to Job';
-                } else if (t.tranType === 'PUR-STK' || t.tranType === 'REC-ADJ') {
-                    typeClass = 'receipt';
-                    typeLabel = 'Receipt';
-                } else if (t.tranType === 'ADJ-QTY' || t.tranType === 'INV-ADJ') {
-                    typeClass = 'adjustment';
-                    typeLabel = 'Adjustment';
-                }
+                // Use the typeClass and typeLabel from the API response
+                const typeClass = t.typeClass || 'other';
+                const typeLabel = t.typeLabel || t.type || 'Unknown';
 
                 // Format quantity with sign
-                const qty = t.tranQty || 0;
+                const qty = t.qty || 0;
                 const qtyDisplay = qty >= 0 ? `+${formatNumber(qty)}` : formatNumber(qty);
                 const qtyColor = qty >= 0 ? '#28a745' : '#dc3545';
 
                 return `
                     <tr>
-                        <td>${formatTransactionDate(t.tranDate)}</td>
+                        <td>${formatTransactionDate(t.date)}</td>
                         <td><span class="tran-type-badge ${typeClass}">${typeLabel}</span></td>
                         <td><strong>${t.partNum || '-'}</strong></td>
                         <td style="color: ${qtyColor}; font-weight: 600;">${qtyDisplay}</td>
                         <td>${t.jobNum || '-'}</td>
-                        <td>${t.wareHouseCode || '-'}</td>
+                        <td>${t.warehouse || '-'}</td>
                         <td>${t.entryPerson || '-'}</td>
                     </tr>
                 `;
@@ -1559,7 +1552,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    jobMaterialsData = result.jobs;
+                    jobMaterialsData = result.data || [];
                     renderJobCards(jobMaterialsData);
                 } else {
                     container.innerHTML = `<div class="tracking-loading" style="grid-column: 1 / -1; color: #dc3545;">Error: ${result.error}</div>`;
