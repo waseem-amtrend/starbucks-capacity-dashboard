@@ -20,7 +20,7 @@ CORS(app)
 PART_INFO_CACHE = {}
 PART_CACHE_EXPIRY = timedelta(hours=1)  # Cache part descriptions for 1 hour
 
-# Epicor REST API Configuration - v1 API
+# Epicor REST API Configuration - v1 API (REST v1 is required for PartWhses, PartTrans, etc.)
 EPICOR_CONFIG = {
     "base_url": "https://centralusdtapp20.epicorsaas.com/SaaS704/api/v1",
     "username": os.environ.get("EPICOR_USERNAME", "Claude.AI"),
